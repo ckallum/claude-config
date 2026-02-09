@@ -45,7 +45,8 @@ function readJsonSync(filePath) {
 
 function resolveHookPaths(obj, claudeConfigDir) {
   const json = JSON.stringify(obj);
-  return JSON.parse(json.replace(/\$\{CLAUDE_CONFIG_DIR\}/g, claudeConfigDir));
+  const safeDir = claudeConfigDir.replace(/\\/g, '\\\\');
+  return JSON.parse(json.replace(/\$\{CLAUDE_CONFIG_DIR\}/g, safeDir));
 }
 
 function main() {
@@ -77,6 +78,10 @@ function main() {
   }
 
   // 4. Resolve ${CLAUDE_CONFIG_DIR} to target's .claude path
+  if (!hooksConfig.hooks) {
+    console.error('  ✗ hooks.json is missing "hooks" key');
+    process.exit(1);
+  }
   const resolvedHooks = resolveHookPaths(hooksConfig.hooks, claudeDir);
 
   // 5. Merge hooks into target settings.json
@@ -167,6 +172,20 @@ function checkGlobalSettings(manifest) {
       console.log(`  ✗ StatusLine not configured: ${manifest.statusLine.command}`);
       console.log(`    → Add statusLine config to ~/.claude/settings.json`);
       allGood = false;
+    }
+  }
+
+  // Check ccstatusline config
+  if (manifest.ccstatusline) {
+    const ccstatuslineDir = path.join(require('os').homedir(), '.config', 'ccstatusline');
+    const ccstatuslinePath = path.join(ccstatuslineDir, 'settings.json');
+    const currentConfig = readJsonSync(ccstatuslinePath);
+    if (currentConfig && currentConfig.version === manifest.ccstatusline.version) {
+      console.log(`  ✓ ccstatusline config (v${currentConfig.version})`);
+    } else {
+      fs.mkdirSync(ccstatuslineDir, { recursive: true });
+      fs.writeFileSync(ccstatuslinePath, JSON.stringify(manifest.ccstatusline, null, 2) + '\n');
+      console.log(`  ✓ Installed ccstatusline config → ${ccstatuslinePath}`);
     }
   }
 
