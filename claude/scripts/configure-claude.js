@@ -46,7 +46,7 @@ function readJsonSync(filePath) {
 function resolveHookPaths(obj, claudeConfigDir) {
   const json = JSON.stringify(obj);
   const safeDir = claudeConfigDir.replace(/\\/g, '\\\\');
-  return JSON.parse(json.replace(/\$\{CLAUDE_CONFIG_DIR\}/g, safeDir));
+  return JSON.parse(json.replace(/\$\{CLAUDE_CONFIG_DIR\}/g, () => safeDir));
 }
 
 function installCcstatuslineConfig(manifest) {
@@ -196,7 +196,12 @@ function checkGlobalSettings(manifest, projectSettingsPath) {
 
   // Check MCP servers
   if (manifest.mcpServers) {
-    const enabledMcp = globalLocal?.enabledMcpServers || [];
+    const rawMcp = globalLocal?.enabledMcpServers;
+    const enabledMcp = Array.isArray(rawMcp)
+      ? rawMcp
+      : (rawMcp && typeof rawMcp === 'object')
+        ? Object.keys(rawMcp).filter(k => rawMcp[k])
+        : [];
     for (const server of manifest.mcpServers) {
       if (enabledMcp.includes(server)) {
         console.log(`  ✓ MCP server: ${server}`);
