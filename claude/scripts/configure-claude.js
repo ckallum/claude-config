@@ -49,8 +49,35 @@ function resolveHookPaths(obj, claudeConfigDir) {
   return JSON.parse(json.replace(/\$\{CLAUDE_CONFIG_DIR\}/g, safeDir));
 }
 
+function installCcstatuslineConfig(manifest) {
+  const ccstatuslineDir = path.join(require('os').homedir(), '.config', 'ccstatusline');
+  const ccstatuslinePath = path.join(ccstatuslineDir, 'settings.json');
+  const existing = readJsonSync(ccstatuslinePath);
+
+  if (existing) {
+    const backupPath = ccstatuslinePath + '.bak';
+    fs.copyFileSync(ccstatuslinePath, backupPath);
+    console.log(`  ✓ Backed up existing config → ${backupPath}`);
+  }
+
+  fs.mkdirSync(ccstatuslineDir, { recursive: true });
+  fs.writeFileSync(ccstatuslinePath, JSON.stringify(manifest.ccstatusline, null, 2) + '\n');
+  console.log(`  ✓ Installed ccstatusline config (v${manifest.ccstatusline.version}) → ${ccstatuslinePath}`);
+}
+
 function main() {
-  const targetDir = path.resolve(process.argv[2] || process.cwd());
+  // Handle --install-ccstatusline flag
+  if (process.argv.includes('--install-ccstatusline')) {
+    const manifest = readJsonSync(GLOBAL_MANIFEST);
+    if (!manifest?.ccstatusline) {
+      console.error('  ✗ No ccstatusline config found in manifest');
+      process.exit(1);
+    }
+    installCcstatuslineConfig(manifest);
+    return;
+  }
+
+  const targetDir = path.resolve(process.argv.filter(a => !a.startsWith('--'))[2] || process.cwd());
   const claudeDir = path.join(targetDir, '.claude');
   const settingsPath = path.join(claudeDir, 'settings.json');
 
@@ -84,16 +111,27 @@ function main() {
   }
   const resolvedHooks = resolveHookPaths(hooksConfig.hooks, claudeDir);
 
-  // 5. Merge hooks into target settings.json
+  // 5. Merge hooks and plugins into target settings.json
   const existingSettings = readJsonSync(settingsPath) || {};
+  const manifest = readJsonSync(GLOBAL_MANIFEST);
+  const pluginsToEnable = {};
+  if (manifest?.plugins) {
+    for (const plugin of manifest.plugins) {
+      pluginsToEnable[plugin] = true;
+    }
+  }
   const merged = {
     ...existingSettings,
-    $schema: hooksConfig.$schema || existingSettings.$schema,
+    ...(hooksConfig.$schema ? { $schema: hooksConfig.$schema } : {}),
     hooks: resolvedHooks,
+    enabledPlugins: { ...existingSettings.enabledPlugins, ...pluginsToEnable },
   };
 
   fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2) + '\n');
   console.log(`  ✓ Merged hooks into ${settingsPath}`);
+  if (manifest?.plugins) {
+    console.log(`  ✓ Enabled ${manifest.plugins.length} plugins in project settings`);
+  }
 
   // Verify no unresolved placeholders remain
   const written = fs.readFileSync(settingsPath, 'utf8');
@@ -105,19 +143,19 @@ function main() {
 
   // 6. Check global settings against manifest
   console.log('\n--- Global settings check ---\n');
-  const manifest = readJsonSync(GLOBAL_MANIFEST);
   if (!manifest) {
     console.log('  ⚠ Could not read global manifest, skipping global check');
   } else {
-    checkGlobalSettings(manifest);
+    checkGlobalSettings(manifest, settingsPath);
   }
 
   console.log('\nDone!\n');
 }
 
-function checkGlobalSettings(manifest) {
+function checkGlobalSettings(manifest, projectSettingsPath) {
   const globalSettings = readJsonSync(HOME_SETTINGS);
   const globalLocal = readJsonSync(HOME_SETTINGS_LOCAL);
+  const projectSettings = readJsonSync(projectSettingsPath);
   let allGood = true;
 
   // Check marketplaces (prerequisite for plugins)
@@ -135,29 +173,36 @@ function checkGlobalSettings(manifest) {
     }
   }
 
-  // Check plugins
+  // Check plugins (global or project-scoped)
   if (manifest.plugins) {
-    const enabledPlugins = globalSettings?.enabledPlugins || {};
-    for (const plugin of manifest.plugins) {
-      if (enabledPlugins[plugin]) {
-        console.log(`  ✓ Plugin: ${plugin}`);
-      } else {
-        console.log(`  ✗ Plugin missing: ${plugin}`);
-        console.log(`    → Enable via Claude Code settings or add to ~/.claude/settings.json`);
-        allGood = false;
+    const globalPlugins = globalSettings?.enabledPlugins;
+    const projectPlugins = projectSettings?.enabledPlugins;
+    if (!globalPlugins && !projectPlugins) {
+      console.log(`  ⚠ No enabledPlugins found in global or project settings — skipping plugin check`);
+    } else {
+      for (const plugin of manifest.plugins) {
+        if (globalPlugins?.[plugin]) {
+          console.log(`  ✓ Plugin: ${plugin} (global)`);
+        } else if (projectPlugins?.[plugin]) {
+          console.log(`  ✓ Plugin: ${plugin} (project)`);
+        } else {
+          console.log(`  ✗ Plugin missing: ${plugin}`);
+          console.log(`    → Enable via Claude Code settings or add to ~/.claude/settings.json`);
+          allGood = false;
+        }
       }
     }
   }
 
   // Check MCP servers
   if (manifest.mcpServers) {
-    const enabledMcp = globalLocal?.enabledMcpjsonServers || [];
+    const enabledMcp = globalLocal?.enabledMcpServers || [];
     for (const server of manifest.mcpServers) {
       if (enabledMcp.includes(server)) {
         console.log(`  ✓ MCP server: ${server}`);
       } else {
         console.log(`  ✗ MCP server missing: ${server}`);
-        console.log(`    → Add "${server}" to enabledMcpjsonServers in ~/.claude/settings.local.json`);
+        console.log(`    → Add "${server}" to enabledMcpServers in ~/.claude/settings.local.json`);
         allGood = false;
       }
     }
@@ -177,15 +222,18 @@ function checkGlobalSettings(manifest) {
 
   // Check ccstatusline config
   if (manifest.ccstatusline) {
-    const ccstatuslineDir = path.join(require('os').homedir(), '.config', 'ccstatusline');
-    const ccstatuslinePath = path.join(ccstatuslineDir, 'settings.json');
+    const ccstatuslinePath = path.join(require('os').homedir(), '.config', 'ccstatusline', 'settings.json');
     const currentConfig = readJsonSync(ccstatuslinePath);
-    if (currentConfig && currentConfig.version === manifest.ccstatusline.version) {
-      console.log(`  ✓ ccstatusline config (v${currentConfig.version})`);
+    if (!currentConfig) {
+      console.log(`  ✗ ccstatusline config missing: ${ccstatuslinePath}`);
+      console.log(`    → Run with --install-ccstatusline to install`);
+      allGood = false;
+    } else if (currentConfig.version !== manifest.ccstatusline.version) {
+      console.log(`  ✗ ccstatusline config version mismatch: v${currentConfig.version} (expected v${manifest.ccstatusline.version})`);
+      console.log(`    → Run with --install-ccstatusline to update`);
+      allGood = false;
     } else {
-      fs.mkdirSync(ccstatuslineDir, { recursive: true });
-      fs.writeFileSync(ccstatuslinePath, JSON.stringify(manifest.ccstatusline, null, 2) + '\n');
-      console.log(`  ✓ Installed ccstatusline config → ${ccstatuslinePath}`);
+      console.log(`  ✓ ccstatusline config (v${currentConfig.version})`);
     }
   }
 
