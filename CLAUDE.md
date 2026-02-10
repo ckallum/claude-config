@@ -18,6 +18,28 @@ skills/      # Custom skills
 agents/      # Custom agent configurations
 ```
 
+## Key file locations
+
+- `~/.claude/settings.json` — global settings; `enabledPlugins` is `{ "name@marketplace": true }`
+- `~/.claude/settings.local.json` — local settings; `enabledMcpjsonServers` is an array of names
+- `~/.claude/plugins/known_marketplaces.json` — object keyed by marketplace name (not an array)
+- `~/.config/ccstatusline/settings.json` — ccstatusline layout config
+- `config/global-settings.json` — this repo's manifest of expected global state
+
+## Gotchas
+
+- `known_marketplaces.json` is an object keyed by name, not an array — use `Object.keys()` to get names
+- Plugins can be enabled at global (`~/.claude/settings.json`) OR project scope (`.claude/settings.json`) — check both
+- `String.prototype.replace` with a string replacement interprets `$` sequences — use a function replacer `() => value` for literal paths
+- `JSON.stringify(undefined)` returns `undefined` (not a string) — guard inputs to `resolveHookPaths`
+- Git repo lives at `Projects/claude/`, NOT at parent `Projects/` — was migrated in this session
+
+## Testing configure-claude.js
+
+- `node scripts/configure-claude.js /tmp/test-project` — full integration test against temp dir
+- `--install-ccstatusline` flag for standalone ccstatusline install
+- Always `rm -rf /tmp/test-project` after testing
+
 ## Versioning
 
 Current version: **1.4**
