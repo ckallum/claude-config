@@ -183,10 +183,22 @@ function findWorkspaces(targetDir) {
   if (pkg?.workspaces) {
     const wsPatterns = Array.isArray(pkg.workspaces) ? pkg.workspaces : pkg.workspaces.packages || [];
     for (const pattern of wsPatterns) {
-      // Simple glob: strip trailing /* or /**
+      const isGlob = /\/\*+$/.test(pattern);
       const dir = pattern.replace(/\/\*+$/, '');
       const wsPath = path.join(targetDir, dir);
-      if (fs.existsSync(wsPath) && fs.statSync(wsPath).isDirectory()) {
+
+      if (!fs.existsSync(wsPath) || !fs.statSync(wsPath).isDirectory()) continue;
+
+      if (isGlob) {
+        // Enumerate children of the glob parent as individual workspaces
+        for (const child of fs.readdirSync(wsPath, { withFileTypes: true })) {
+          if (!child.isDirectory()) continue;
+          const childPath = path.join(wsPath, child.name);
+          if (!workspaces.find(w => w.path === childPath)) {
+            workspaces.push({ name: child.name, path: childPath });
+          }
+        }
+      } else {
         if (!workspaces.find(w => w.path === wsPath)) {
           workspaces.push({ name: dir, path: wsPath });
         }
