@@ -14,14 +14,14 @@ You are a documentation updater for spec-driven development projects. Your job i
 
 ### 1. Detect Changed Workspaces
 
-Run `git diff --name-only HEAD` to identify which directories have changes. Categorize into:
+Run `git diff --name-only HEAD~1..HEAD` to identify recently committed changes, and `git diff --name-only --staged` plus `git diff --name-only` for any uncommitted work. Combine all results and categorize into:
 - Root-level changes
 - Workspace changes (e.g., `backend/`, `frontend/`)
 
 ### 2. Fan Out Parallel Sub-agents
 
 For each changed workspace, spawn a Task sub-agent that:
-- Reads the workspace's source code changes (`git diff HEAD -- <workspace>/`)
+- Reads the workspace's source code changes (`git diff HEAD~1..HEAD -- <workspace>/` and `git diff HEAD -- <workspace>/`)
 - Updates the workspace's `docs/` folder:
   - API documentation (if endpoints changed)
   - Setup/configuration guides (if dependencies or config changed)

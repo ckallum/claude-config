@@ -1,7 +1,7 @@
 ---
 name: update-docs
 description: Update project documentation, specs, and changelog based on recent changes
-user_invocable: true
+user-invocable: true
 arguments: Optional spec name to focus on (e.g., "auth-system")
 ---
 

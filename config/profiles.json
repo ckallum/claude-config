@@ -43,7 +43,7 @@
       "plugins": ["frontend-design@claude-plugins-official"]
     },
     "backend": {
-      "extends": "typescript",
+      "extends": "base",
       "plugins": []
     },
     "monorepo-root": {

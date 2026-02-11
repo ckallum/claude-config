@@ -108,26 +108,26 @@ function matchesSignal(targetDir, signal) {
     }
   }
 
-  // Check package.json fields
+  // Check package.json fields (must be non-empty)
   if (signal.packageFields) {
     const pkg = readJsonSync(path.join(targetDir, 'package.json'));
     if (pkg) {
       for (const field of signal.packageFields) {
-        if (pkg[field]) return true;
+        const val = pkg[field];
+        if (val == null) continue;
+        if (Array.isArray(val) && val.length > 0) return true;
+        if (typeof val === 'string' && val.trim().length > 0) return true;
+        if (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0) return true;
       }
     }
   }
 
-  // Check subdirectory existence
+  // Check subdirectory existence (any match triggers)
   if (signal.dirs) {
-    let allExist = true;
     for (const dir of signal.dirs) {
-      if (!fs.existsSync(path.join(targetDir, dir)) || !fs.statSync(path.join(targetDir, dir)).isDirectory()) {
-        allExist = false;
-        break;
-      }
+      const dirPath = path.join(targetDir, dir);
+      if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) return true;
     }
-    if (signal.dirs.length > 0 && allExist) return true;
   }
 
   return false;

@@ -299,10 +299,13 @@ function runCommand(cmd, options = {}) {
       stdio: ['pipe', 'pipe', 'pipe'],
       ...options
     });
+    if (result.error) {
+      return { success: false, output: result.error.message.trim() };
+    }
     if (result.status === 0) {
       return { success: true, output: (result.stdout || '').trim() };
     }
-    return { success: false, output: (result.stderr || result.error?.message || '').trim() };
+    return { success: false, output: (result.stderr || '').trim() };
   } catch (err) {
     return { success: false, output: err.message };
   }
