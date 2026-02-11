@@ -4,7 +4,8 @@
  * configure-claude.js
  *
  * Installs Claude Code hooks, scripts, and config into a target project's .claude/ directory.
- * Also checks global ~/.claude/settings.json against the expected manifest.
+ * Auto-detects project type (typescript, python, frontend, backend, monorepo) and installs
+ * only relevant plugins, skills, agents, and templates per profile.
  *
  * Usage: node configure-claude.js [target-directory]
  *   target-directory defaults to cwd
@@ -16,8 +17,12 @@ const path = require('path');
 const CONFIG_REPO = path.resolve(__dirname, '..');
 const HOOKS_JSON = path.join(CONFIG_REPO, 'hooks', 'hooks.json');
 const GLOBAL_MANIFEST = path.join(CONFIG_REPO, 'config', 'global-settings.json');
+const PROFILES_JSON = path.join(CONFIG_REPO, 'config', 'profiles.json');
 const SCRIPTS_HOOKS = path.join(CONFIG_REPO, 'scripts', 'hooks');
 const SCRIPTS_LIB = path.join(CONFIG_REPO, 'scripts', 'lib');
+const SKILLS_DIR = path.join(CONFIG_REPO, 'skills');
+const AGENTS_DIR = path.join(CONFIG_REPO, 'agents');
+const TEMPLATES_DIR = path.join(CONFIG_REPO, 'templates');
 const HOME_SETTINGS = path.join(require('os').homedir(), '.claude', 'settings.json');
 const HOME_SETTINGS_LOCAL = path.join(require('os').homedir(), '.claude', 'settings.local.json');
 const KNOWN_MARKETPLACES = path.join(require('os').homedir(), '.claude', 'plugins', 'known_marketplaces.json');
@@ -35,6 +40,23 @@ function copyDirSync(src, dest) {
   }
 }
 
+/**
+ * Copy a directory, but only if destination files don't already exist.
+ * Preserves existing files (never overwrites).
+ */
+function copyDirSyncNoOverwrite(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirSyncNoOverwrite(srcPath, destPath);
+    } else if (!fs.existsSync(destPath)) {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
 function readJsonSync(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -47,6 +69,261 @@ function resolveHookPaths(obj, claudeConfigDir) {
   const json = JSON.stringify(obj);
   const safeDir = claudeConfigDir.replace(/\\/g, '\\\\');
   return JSON.parse(json.replace(/\$\{CLAUDE_CONFIG_DIR\}/g, () => safeDir));
+}
+
+// --- Profile detection ---
+
+function detectProfiles(targetDir) {
+  const profilesConfig = readJsonSync(PROFILES_JSON);
+  if (!profilesConfig) return ['base'];
+
+  const signals = profilesConfig.signals;
+  const matched = [];
+
+  for (const [name, signal] of Object.entries(signals)) {
+    if (matchesSignal(targetDir, signal)) {
+      matched.push(name);
+    }
+  }
+
+  return matched.length > 0 ? matched : ['base'];
+}
+
+function matchesSignal(targetDir, signal) {
+  // Check file existence
+  if (signal.files) {
+    for (const file of signal.files) {
+      if (fs.existsSync(path.join(targetDir, file))) return true;
+    }
+  }
+
+  // Check package.json dependencies
+  if (signal.packageDeps) {
+    const pkg = readJsonSync(path.join(targetDir, 'package.json'));
+    if (pkg) {
+      const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+      for (const dep of signal.packageDeps) {
+        if (allDeps[dep]) return true;
+      }
+    }
+  }
+
+  // Check package.json fields (must be non-empty)
+  if (signal.packageFields) {
+    const pkg = readJsonSync(path.join(targetDir, 'package.json'));
+    if (pkg) {
+      for (const field of signal.packageFields) {
+        const val = pkg[field];
+        if (val == null) continue;
+        if (Array.isArray(val) && val.length > 0) return true;
+        if (typeof val === 'string' && val.trim().length > 0) return true;
+        if (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0) return true;
+      }
+    }
+  }
+
+  // Check subdirectory existence (any match triggers)
+  if (signal.dirs) {
+    for (const dir of signal.dirs) {
+      const dirPath = path.join(targetDir, dir);
+      if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) return true;
+    }
+  }
+
+  return false;
+}
+
+function resolveProfile(profileNames, profilesConfig) {
+  const profiles = profilesConfig.profiles;
+  const resolved = { plugins: new Set(), skills: new Set(), agents: new Set(), templates: new Set() };
+
+  for (const name of profileNames) {
+    mergeProfile(name, profiles, resolved, new Set());
+  }
+
+  return {
+    plugins: [...resolved.plugins],
+    skills: [...resolved.skills],
+    agents: [...resolved.agents],
+    templates: [...resolved.templates],
+  };
+}
+
+function mergeProfile(name, profiles, resolved, visited) {
+  if (visited.has(name)) return;
+  visited.add(name);
+
+  const profile = profiles[name];
+  if (!profile) return;
+
+  // Resolve parent first
+  if (profile.extends) {
+    mergeProfile(profile.extends, profiles, resolved, visited);
+  }
+
+  if (profile.plugins) profile.plugins.forEach(p => resolved.plugins.add(p));
+  if (profile.skills) profile.skills.forEach(s => resolved.skills.add(s));
+  if (profile.agents) profile.agents.forEach(a => resolved.agents.add(a));
+  if (profile.templates) profile.templates.forEach(t => resolved.templates.add(t));
+}
+
+function findWorkspaces(targetDir) {
+  const workspaces = [];
+
+  // Check for backend/ and frontend/ subdirs
+  for (const name of ['backend', 'frontend']) {
+    const wsPath = path.join(targetDir, name);
+    if (fs.existsSync(wsPath) && fs.statSync(wsPath).isDirectory()) {
+      workspaces.push({ name, path: wsPath });
+    }
+  }
+
+  // Also check package.json workspaces field for additional dirs
+  const pkg = readJsonSync(path.join(targetDir, 'package.json'));
+  if (pkg?.workspaces) {
+    const wsPatterns = Array.isArray(pkg.workspaces) ? pkg.workspaces : pkg.workspaces.packages || [];
+    for (const pattern of wsPatterns) {
+      const isGlob = /\/\*+$/.test(pattern);
+      const dir = pattern.replace(/\/\*+$/, '');
+      const wsPath = path.join(targetDir, dir);
+
+      if (!fs.existsSync(wsPath) || !fs.statSync(wsPath).isDirectory()) continue;
+
+      if (isGlob) {
+        // Enumerate children of the glob parent as individual workspaces
+        for (const child of fs.readdirSync(wsPath, { withFileTypes: true })) {
+          if (!child.isDirectory()) continue;
+          const childPath = path.join(wsPath, child.name);
+          if (!workspaces.find(w => w.path === childPath)) {
+            workspaces.push({ name: child.name, path: childPath });
+          }
+        }
+      } else {
+        if (!workspaces.find(w => w.path === wsPath)) {
+          workspaces.push({ name: dir, path: wsPath });
+        }
+      }
+    }
+  }
+
+  return workspaces;
+}
+
+// --- Installation ---
+
+function installForProfile(targetDir, resolvedProfile, label) {
+  const claudeDir = path.join(targetDir, '.claude');
+  const settingsPath = path.join(claudeDir, 'settings.json');
+
+  console.log(`\n--- Installing: ${label} (${targetDir}) ---\n`);
+
+  // 1. Create .claude/ directory
+  fs.mkdirSync(claudeDir, { recursive: true });
+  console.log(`  ✓ Ensured ${claudeDir} exists`);
+
+  // 2. Copy scripts/hooks/ and scripts/lib/
+  const destHooks = path.join(claudeDir, 'scripts', 'hooks');
+  const destLib = path.join(claudeDir, 'scripts', 'lib');
+
+  copyDirSync(SCRIPTS_HOOKS, destHooks);
+  console.log(`  ✓ Copied hook scripts → ${destHooks}`);
+
+  copyDirSync(SCRIPTS_LIB, destLib);
+  console.log(`  ✓ Copied lib scripts  → ${destLib}`);
+
+  // 3. Copy skills (only those in resolved profile)
+  const destSkills = path.join(claudeDir, 'skills');
+  let skillCount = 0;
+  for (const skillName of resolvedProfile.skills) {
+    const srcSkill = path.join(SKILLS_DIR, skillName);
+    if (fs.existsSync(srcSkill) && fs.statSync(srcSkill).isDirectory()) {
+      copyDirSync(srcSkill, path.join(destSkills, skillName));
+      skillCount++;
+    }
+  }
+  console.log(`  ✓ Copied ${skillCount} skill(s) → ${destSkills}`);
+
+  // 4. Copy agents (only those in resolved profile)
+  if (resolvedProfile.agents.length > 0) {
+    const destAgents = path.join(claudeDir, 'agents');
+    fs.mkdirSync(destAgents, { recursive: true });
+    let agentCount = 0;
+    for (const agentName of resolvedProfile.agents) {
+      const srcAgent = path.join(AGENTS_DIR, `${agentName}.md`);
+      if (fs.existsSync(srcAgent)) {
+        fs.copyFileSync(srcAgent, path.join(destAgents, `${agentName}.md`));
+        agentCount++;
+      }
+    }
+    console.log(`  ✓ Copied ${agentCount} agent(s) → ${destAgents}`);
+  }
+
+  // 5. Copy templates (never overwrite existing)
+  if (resolvedProfile.templates.includes('specs')) {
+    // Copy spec templates → .claude/specs/
+    const destSpecs = path.join(claudeDir, 'specs');
+    copyDirSyncNoOverwrite(path.join(TEMPLATES_DIR, 'specs'), destSpecs);
+    console.log(`  ✓ Copied spec templates → ${destSpecs} (no overwrite)`);
+
+    // Copy SPECLOG.md and CHANGELOG.md → project root
+    for (const file of ['SPECLOG.md', 'CHANGELOG.md']) {
+      const destFile = path.join(targetDir, file);
+      if (!fs.existsSync(destFile)) {
+        fs.copyFileSync(path.join(TEMPLATES_DIR, file), destFile);
+        console.log(`  ✓ Created ${file}`);
+      } else {
+        console.log(`  ✓ ${file} already exists (skipped)`);
+      }
+    }
+
+    // Copy docs/ template → project root docs/
+    const destDocs = path.join(targetDir, 'docs');
+    if (!fs.existsSync(destDocs)) {
+      copyDirSyncNoOverwrite(path.join(TEMPLATES_DIR, 'docs'), destDocs);
+      console.log(`  ✓ Created docs/ folder`);
+    } else {
+      console.log(`  ✓ docs/ already exists (skipped)`);
+    }
+  }
+
+  // 6. Read hooks.json from config repo
+  const hooksConfig = readJsonSync(HOOKS_JSON);
+  if (!hooksConfig) {
+    console.error('  ✗ Could not read hooks.json from config repo');
+    process.exit(1);
+  }
+
+  if (!hooksConfig.hooks) {
+    console.error('  ✗ hooks.json is missing "hooks" key');
+    process.exit(1);
+  }
+  const resolvedHooks = resolveHookPaths(hooksConfig.hooks, claudeDir);
+
+  // 7. Merge hooks and plugins into target settings.json
+  const existingSettings = readJsonSync(settingsPath) || {};
+  const pluginsToEnable = {};
+  for (const plugin of resolvedProfile.plugins) {
+    pluginsToEnable[plugin] = true;
+  }
+
+  const merged = {
+    ...existingSettings,
+    ...(hooksConfig.$schema ? { $schema: hooksConfig.$schema } : {}),
+    hooks: resolvedHooks,
+    enabledPlugins: { ...existingSettings.enabledPlugins, ...pluginsToEnable },
+  };
+
+  fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2) + '\n');
+  console.log(`  ✓ Merged hooks into ${settingsPath}`);
+  console.log(`  ✓ Enabled ${resolvedProfile.plugins.length} plugin(s) in project settings`);
+
+  // Verify no unresolved placeholders remain
+  const written = fs.readFileSync(settingsPath, 'utf8');
+  if (written.includes('${CLAUDE_CONFIG_DIR}')) {
+    console.error('  ✗ WARNING: Unresolved ${CLAUDE_CONFIG_DIR} found in settings.json');
+  } else {
+    console.log('  ✓ All hook paths resolved (no ${CLAUDE_CONFIG_DIR} remaining)');
+  }
 }
 
 function installCcstatuslineConfig(manifest) {
@@ -78,75 +355,59 @@ function main() {
   }
 
   const targetDir = path.resolve(process.argv.filter(a => !a.startsWith('--'))[2] || process.cwd());
-  const claudeDir = path.join(targetDir, '.claude');
-  const settingsPath = path.join(claudeDir, 'settings.json');
+  const profilesConfig = readJsonSync(PROFILES_JSON);
+
+  if (!profilesConfig) {
+    console.error('  ✗ Could not read profiles.json');
+    process.exit(1);
+  }
 
   console.log(`\nConfiguring Claude Code for: ${targetDir}\n`);
 
-  // 1. Create .claude/ directory
-  fs.mkdirSync(claudeDir, { recursive: true });
-  console.log(`  ✓ Ensured ${claudeDir} exists`);
+  // Detect profiles
+  const detectedProfiles = detectProfiles(targetDir);
+  console.log(`  Detected profiles: ${detectedProfiles.join(', ')}`);
 
-  // 2. Copy scripts/hooks/ and scripts/lib/
-  const destHooks = path.join(claudeDir, 'scripts', 'hooks');
-  const destLib = path.join(claudeDir, 'scripts', 'lib');
+  const isMonorepo = detectedProfiles.includes('monorepo');
 
-  copyDirSync(SCRIPTS_HOOKS, destHooks);
-  console.log(`  ✓ Copied hook scripts → ${destHooks}`);
+  if (isMonorepo) {
+    // Install root with monorepo-root profile
+    const rootProfileNames = detectedProfiles.filter(p => p !== 'monorepo').concat('monorepo-root');
+    const rootResolved = resolveProfile(rootProfileNames, profilesConfig);
+    installForProfile(targetDir, rootResolved, `monorepo root [${rootProfileNames.join(', ')}]`);
 
-  copyDirSync(SCRIPTS_LIB, destLib);
-  console.log(`  ✓ Copied lib scripts  → ${destLib}`);
+    // Create docs/ in each workspace (if templates include specs)
+    const workspaces = findWorkspaces(targetDir);
 
-  // 3. Read hooks.json from config repo
-  const hooksConfig = readJsonSync(HOOKS_JSON);
-  if (!hooksConfig) {
-    console.error('  ✗ Could not read hooks.json from config repo');
-    process.exit(1);
-  }
+    // Install each workspace with its own detected profile
+    for (const ws of workspaces) {
+      const wsProfiles = detectProfiles(ws.path);
+      console.log(`\n  Workspace "${ws.name}" profiles: ${wsProfiles.join(', ')}`);
+      const wsResolved = resolveProfile(wsProfiles, profilesConfig);
+      installForProfile(ws.path, wsResolved, `workspace: ${ws.name} [${wsProfiles.join(', ')}]`);
 
-  // 4. Resolve ${CLAUDE_CONFIG_DIR} to target's .claude path
-  if (!hooksConfig.hooks) {
-    console.error('  ✗ hooks.json is missing "hooks" key');
-    process.exit(1);
-  }
-  const resolvedHooks = resolveHookPaths(hooksConfig.hooks, claudeDir);
-
-  // 5. Merge hooks and plugins into target settings.json
-  const existingSettings = readJsonSync(settingsPath) || {};
-  const manifest = readJsonSync(GLOBAL_MANIFEST);
-  const pluginsToEnable = {};
-  if (manifest?.plugins) {
-    for (const plugin of manifest.plugins) {
-      pluginsToEnable[plugin] = true;
+      // Create docs/ in workspace if root has specs template
+      if (rootResolved.templates.includes('specs')) {
+        const wsDocs = path.join(ws.path, 'docs');
+        if (!fs.existsSync(wsDocs)) {
+          copyDirSyncNoOverwrite(path.join(TEMPLATES_DIR, 'docs'), wsDocs);
+          console.log(`  ✓ Created ${ws.name}/docs/ folder`);
+        }
+      }
     }
-  }
-  const merged = {
-    ...existingSettings,
-    ...(hooksConfig.$schema ? { $schema: hooksConfig.$schema } : {}),
-    hooks: resolvedHooks,
-    enabledPlugins: { ...existingSettings.enabledPlugins, ...pluginsToEnable },
-  };
-
-  fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2) + '\n');
-  console.log(`  ✓ Merged hooks into ${settingsPath}`);
-  if (manifest?.plugins) {
-    console.log(`  ✓ Enabled ${manifest.plugins.length} plugins in project settings`);
-  }
-
-  // Verify no unresolved placeholders remain
-  const written = fs.readFileSync(settingsPath, 'utf8');
-  if (written.includes('${CLAUDE_CONFIG_DIR}')) {
-    console.error('  ✗ WARNING: Unresolved ${CLAUDE_CONFIG_DIR} found in settings.json');
   } else {
-    console.log('  ✓ All hook paths resolved (no ${CLAUDE_CONFIG_DIR} remaining)');
+    // Single project installation
+    const resolved = resolveProfile(detectedProfiles, profilesConfig);
+    installForProfile(targetDir, resolved, detectedProfiles.join(', '));
   }
 
-  // 6. Check global settings against manifest
+  // Global settings check
+  const manifest = readJsonSync(GLOBAL_MANIFEST);
   console.log('\n--- Global settings check ---\n');
   if (!manifest) {
     console.log('  ⚠ Could not read global manifest, skipping global check');
   } else {
-    checkGlobalSettings(manifest, settingsPath);
+    checkGlobalSettings(manifest, path.join(targetDir, '.claude', 'settings.json'));
   }
 
   console.log('\nDone!\n');
