@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync, spawnSync } = require('child_process');
+const { spawnSync } = require('child_process');
 
 // Platform detection
 const isWindows = process.platform === 'win32';
@@ -285,23 +285,26 @@ function commandExists(cmd) {
 /**
  * Run a command and return output
  *
- * SECURITY NOTE: This function executes shell commands. Only use with
- * trusted, hardcoded commands. Never pass user-controlled input directly.
- * For user input, use spawnSync with argument arrays instead.
+ * Uses spawnSync to avoid needing /bin/sh, which may not be available
+ * in sandboxed hook environments. Splits the command string into args.
  *
  * @param {string} cmd - Command to execute (should be trusted/hardcoded)
- * @param {object} options - execSync options
+ * @param {object} options - spawnSync options
  */
 function runCommand(cmd, options = {}) {
   try {
-    const result = execSync(cmd, {
+    const parts = cmd.split(/\s+/);
+    const result = spawnSync(parts[0], parts.slice(1), {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
       ...options
     });
-    return { success: true, output: result.trim() };
+    if (result.status === 0) {
+      return { success: true, output: (result.stdout || '').trim() };
+    }
+    return { success: false, output: (result.stderr || result.error?.message || '').trim() };
   } catch (err) {
-    return { success: false, output: err.stderr || err.message };
+    return { success: false, output: err.message };
   }
 }
 
@@ -379,6 +382,27 @@ function grepFile(filePath, pattern) {
   return results;
 }
 
+/**
+ * Walk up from startDir looking for .claude/specs/. Stops at git root.
+ * Returns { specsDir, projectRoot } or null.
+ */
+function findSpecsDir(startDir) {
+  let dir = path.resolve(startDir || process.cwd());
+  while (true) {
+    const specsDir = path.join(dir, '.claude', 'specs');
+    if (fs.existsSync(specsDir) && fs.statSync(specsDir).isDirectory()) {
+      return { specsDir, projectRoot: dir };
+    }
+    // Stop at git root
+    if (fs.existsSync(path.join(dir, '.git'))) {
+      return null;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
 module.exports = {
   // Platform info
   isWindows,
@@ -422,5 +446,6 @@ module.exports = {
   commandExists,
   runCommand,
   isGitRepo,
-  getGitModifiedFiles
+  getGitModifiedFiles,
+  findSpecsDir
 };

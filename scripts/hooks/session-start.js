@@ -12,6 +12,8 @@ const {
   getSessionsDir,
   getLearnedSkillsDir,
   findFiles,
+  findSpecsDir,
+  readFile,
   ensureDir,
   log
 } = require('../lib/utils');
@@ -60,6 +62,50 @@ async function main() {
   if (pm.source === 'fallback' || pm.source === 'default') {
     log('[SessionStart] No package manager preference found.');
     log(getSelectionPrompt());
+  }
+
+  // Spec-driven development awareness
+  const specResult = findSpecsDir(process.cwd());
+  if (specResult) {
+    const { specsDir, projectRoot } = specResult;
+
+    // Read SPECLOG.md for in-progress specs
+    const speclogPath = require('path').join(projectRoot, 'SPECLOG.md');
+    const speclog = readFile(speclogPath);
+    if (speclog) {
+      const inProgress = speclog.split('\n').filter(line => /in.?progress/i.test(line));
+      if (inProgress.length > 0) {
+        log(`[SessionStart] SPECLOG: ${inProgress.length} spec(s) in progress`);
+      }
+    }
+
+    // Find tasks.md files with incomplete tasks
+    const specEntries = findFiles(specsDir, 'tasks.md', { recursive: true });
+    for (const entry of specEntries) {
+      const content = readFile(entry.path);
+      if (content) {
+        const incomplete = content.split('\n').filter(line => /^- \[ \]/.test(line.trim()));
+        if (incomplete.length > 0) {
+          const specName = require('path').basename(require('path').dirname(entry.path));
+          log(`[SessionStart] Spec "${specName}": ${incomplete.length} task(s) remaining`);
+        }
+      }
+    }
+
+    // Read last changelog entry
+    const changelogPath = require('path').join(projectRoot, 'CHANGELOG.md');
+    const changelog = readFile(changelogPath);
+    if (changelog) {
+      const unreleased = changelog.match(/## \[Unreleased\]([\s\S]*?)(?=\n## |\n*$)/);
+      if (unreleased) {
+        const items = unreleased[1].split('\n').filter(line => /^- /.test(line.trim()));
+        if (items.length > 0) {
+          log(`[SessionStart] CHANGELOG: ${items.length} unreleased item(s)`);
+        }
+      }
+    }
+
+    log('[SessionStart] Run @context-loader for full project briefing and task prioritization');
   }
 
   process.exit(0);

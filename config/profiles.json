@@ -1,0 +1,56 @@
+{
+  "signals": {
+    "typescript": { "files": ["tsconfig.json"] },
+    "python": { "files": ["requirements.txt", "pyproject.toml", "setup.py", "Pipfile"] },
+    "frontend": {
+      "packageDeps": ["react", "vue", "svelte", "next", "nuxt", "angular"],
+      "files": ["next.config.js", "next.config.ts", "vite.config.ts", "vite.config.js"]
+    },
+    "backend": {
+      "packageDeps": ["express", "fastify", "hono", "@nestjs/core", "django", "flask", "fastapi"]
+    },
+    "monorepo": {
+      "dirs": ["backend", "frontend"],
+      "packageFields": ["workspaces"]
+    }
+  },
+  "profiles": {
+    "base": {
+      "plugins": [
+        "commit-commands@claude-plugins-official",
+        "superpowers@claude-plugins-official",
+        "claude-md-management@claude-plugins-official",
+        "hookify@claude-plugins-official",
+        "code-simplifier@claude-plugins-official",
+        "code-review@claude-plugins-official",
+        "pr-review-toolkit@claude-plugins-official",
+        "security-guidance@claude-plugins-official",
+        "feature-dev@claude-plugins-official"
+      ],
+      "skills": ["configure-claude", "strategic-compact", "spec-interview"],
+      "agents": []
+    },
+    "typescript": {
+      "extends": "base",
+      "plugins": ["typescript-lsp@claude-plugins-official"]
+    },
+    "python": {
+      "extends": "base",
+      "plugins": ["pyright-lsp@claude-plugins-official"]
+    },
+    "frontend": {
+      "extends": "typescript",
+      "plugins": ["frontend-design@claude-plugins-official"]
+    },
+    "backend": {
+      "extends": "typescript",
+      "plugins": []
+    },
+    "monorepo-root": {
+      "extends": "base",
+      "skills": ["configure-claude", "strategic-compact", "spec-interview", "update-docs"],
+      "agents": ["context-loader", "doc-updater"],
+      "templates": ["specs"]
+    }
+  }
+}

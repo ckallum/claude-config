@@ -12,10 +12,11 @@ Personal Claude Code configuration repository (dotfiles-style). Stores hooks, co
 hooks/       # Custom hooks (shell commands triggered by Claude Code events)
 commands/    # Custom slash commands
 scripts/     # Standalone utility scripts + configure-claude installer
-config/      # Global settings manifest (plugins, MCP servers, statusLine)
+config/      # Global settings manifest + profiles.json (profile→plugin/skill/agent mappings)
 plugins/     # Claude Code plugins
-skills/      # Custom skills
-agents/      # Custom agent configurations
+skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs)
+agents/      # Agent .md files with YAML frontmatter (@context-loader, @doc-updater)
+templates/   # Spec, doc, and changelog templates (never overwritten on re-install)
 ```
 
 ## Key file locations
@@ -25,6 +26,7 @@ agents/      # Custom agent configurations
 - `~/.claude/plugins/known_marketplaces.json` — object keyed by marketplace name (not an array)
 - `~/.config/ccstatusline/settings.json` — ccstatusline layout config
 - `config/global-settings.json` — this repo's manifest of expected global state
+- `config/profiles.json` — profile detection signals and profile→plugin/skill/agent mappings
 
 ## Gotchas
 
@@ -42,7 +44,7 @@ agents/      # Custom agent configurations
 
 ## Versioning
 
-Current version: **1.4**
+Current version: **1.5**
 
 When making changes to this repo:
 1. Bump the version in both CLAUDE.md and README.md
@@ -50,6 +52,7 @@ When making changes to this repo:
 
 ## Changelog
 
+- **1.5** — Mono-repo support + spec-driven development: profile-based installer (`config/profiles.json`), spec/doc templates, `@context-loader` and `@doc-updater` agents, `/update-docs` skill, spec-aware session hooks
 - **1.4** — Added marketplace checks to `configure-claude.js`; manifest now includes `marketplaces` array
 - **1.3** — Added `configure-claude.js` installer script, `config/global-settings.json` manifest; skill now invokes the script directly
 - **1.2** — Added `configure-claude` skill: installs hooks and scripts into any project's `.claude/` directory

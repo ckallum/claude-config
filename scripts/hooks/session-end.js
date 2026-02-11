@@ -18,6 +18,8 @@ const {
   ensureDir,
   writeFile,
   replaceInFile,
+  findSpecsDir,
+  getGitModifiedFiles,
   log
 } = require('../lib/utils');
 
@@ -73,6 +75,20 @@ async function main() {
 
     writeFile(sessionFile, template);
     log(`[SessionEnd] Created session file: ${sessionFile}`);
+  }
+
+  // Spec change detection
+  const specResult = findSpecsDir(process.cwd());
+  if (specResult) {
+    const modifiedFiles = getGitModifiedFiles([
+      '\\.claude/specs/',
+      'SPECLOG\\.md',
+      'CHANGELOG\\.md'
+    ]);
+    if (modifiedFiles.length > 0) {
+      log(`[SessionEnd] Spec files modified: ${modifiedFiles.join(', ')}`);
+      log('[SessionEnd] Consider running @doc-updater to update documentation');
+    }
   }
 
   process.exit(0);
