@@ -15,7 +15,7 @@ scripts/     # Standalone utility scripts + configure-claude installer
 config/      # Global settings manifest + profiles.json (profile→plugin/skill/agent mappings)
 plugins/     # Claude Code plugins
 skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs)
-agents/      # Agent .md files with YAML frontmatter (@context-loader, @doc-updater)
+agents/      # Agent .md files with YAML frontmatter (@context-loader, @doc-updater, @browser)
 templates/   # Spec, doc, and changelog templates (never overwritten on re-install)
 ```
 
@@ -25,7 +25,8 @@ templates/   # Spec, doc, and changelog templates (never overwritten on re-insta
 - `~/.claude/settings.local.json` — local settings; `enabledMcpjsonServers` is an array of names
 - `~/.claude/plugins/known_marketplaces.json` — object keyed by marketplace name (not an array)
 - `~/.config/ccstatusline/settings.json` — ccstatusline layout config
-- `config/global-settings.json` — this repo's manifest of expected global state
+- `~/.mcp.json` — global MCP server configs; installer auto-adds missing servers from manifest
+- `config/global-settings.json` — this repo's manifest of expected global state; `mcpServers` is an object of server configs (not a name array)
 - `config/profiles.json` — profile detection signals and profile→plugin/skill/agent mappings
 
 ## Gotchas
@@ -44,7 +45,7 @@ templates/   # Spec, doc, and changelog templates (never overwritten on re-insta
 
 ## Versioning
 
-Current version: **1.5**
+Current version: **1.6**
 
 When making changes to this repo:
 1. Bump the version in both CLAUDE.md and README.md
@@ -52,6 +53,7 @@ When making changes to this repo:
 
 ## Changelog
 
+- **1.6** — `@browser` agent (agent-browser CLI), Excalidraw MCP integration for `@doc-updater` diagrams, MCP auto-installation in configure script, monorepo workspace plugin check fix
 - **1.5** — Mono-repo support + spec-driven development: profile-based installer (`config/profiles.json`), spec/doc templates, `@context-loader` and `@doc-updater` agents, `/update-docs` skill, spec-aware session hooks
 - **1.4** — Added marketplace checks to `configure-claude.js`; manifest now includes `marketplaces` array
 - **1.3** — Added `configure-claude.js` installer script, `config/global-settings.json` manifest; skill now invokes the script directly

@@ -40,7 +40,8 @@
     },
     "frontend": {
       "extends": "typescript",
-      "plugins": ["frontend-design@claude-plugins-official"]
+      "plugins": ["frontend-design@claude-plugins-official"],
+      "agents": ["browser"]
     },
     "backend": {
       "extends": "base",
@@ -49,7 +50,7 @@
     "monorepo-root": {
       "extends": "base",
       "skills": ["configure-claude", "strategic-compact", "spec-interview", "update-docs", "session-start"],
-      "agents": ["context-loader", "doc-updater"],
+      "agents": ["context-loader", "doc-updater", "browser"],
       "templates": ["specs"]
     }
   }

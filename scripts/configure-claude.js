@@ -23,9 +23,11 @@ const SCRIPTS_LIB = path.join(CONFIG_REPO, 'scripts', 'lib');
 const SKILLS_DIR = path.join(CONFIG_REPO, 'skills');
 const AGENTS_DIR = path.join(CONFIG_REPO, 'agents');
 const TEMPLATES_DIR = path.join(CONFIG_REPO, 'templates');
-const HOME_SETTINGS = path.join(require('os').homedir(), '.claude', 'settings.json');
-const HOME_SETTINGS_LOCAL = path.join(require('os').homedir(), '.claude', 'settings.local.json');
-const KNOWN_MARKETPLACES = path.join(require('os').homedir(), '.claude', 'plugins', 'known_marketplaces.json');
+const HOME_DIR = require('os').homedir();
+const HOME_SETTINGS = path.join(HOME_DIR, '.claude', 'settings.json');
+const HOME_SETTINGS_LOCAL = path.join(HOME_DIR, '.claude', 'settings.local.json');
+const HOME_MCP_JSON = path.join(HOME_DIR, '.mcp.json');
+const KNOWN_MARKETPLACES = path.join(HOME_DIR, '.claude', 'plugins', 'known_marketplaces.json');
 
 function copyDirSync(src, dest) {
   fs.mkdirSync(dest, { recursive: true });
@@ -407,16 +409,25 @@ function main() {
   if (!manifest) {
     console.log('  ⚠ Could not read global manifest, skipping global check');
   } else {
-    checkGlobalSettings(manifest, path.join(targetDir, '.claude', 'settings.json'));
+    const settingsPaths = [path.join(targetDir, '.claude', 'settings.json')];
+    if (isMonorepo) {
+      const workspaces = findWorkspaces(targetDir);
+      for (const ws of workspaces) {
+        settingsPaths.push(path.join(ws.path, '.claude', 'settings.json'));
+      }
+    }
+    checkGlobalSettings(manifest, settingsPaths);
   }
 
   console.log('\nDone!\n');
 }
 
-function checkGlobalSettings(manifest, projectSettingsPath) {
+function checkGlobalSettings(manifest, projectSettingsPaths) {
   const globalSettings = readJsonSync(HOME_SETTINGS);
   const globalLocal = readJsonSync(HOME_SETTINGS_LOCAL);
-  const projectSettings = readJsonSync(projectSettingsPath);
+  const allProjectSettings = (Array.isArray(projectSettingsPaths) ? projectSettingsPaths : [projectSettingsPaths])
+    .map(p => readJsonSync(p))
+    .filter(Boolean);
   let allGood = true;
 
   // Check marketplaces (prerequisite for plugins)
@@ -434,43 +445,72 @@ function checkGlobalSettings(manifest, projectSettingsPath) {
     }
   }
 
-  // Check plugins (global or project-scoped)
+  // Check plugins (global or project-scoped, including workspace settings)
   if (manifest.plugins) {
     const globalPlugins = globalSettings?.enabledPlugins;
-    const projectPlugins = projectSettings?.enabledPlugins;
-    if (!globalPlugins && !projectPlugins) {
+    if (!globalPlugins && allProjectSettings.length === 0) {
       console.log(`  ⚠ No enabledPlugins found in global or project settings — skipping plugin check`);
     } else {
       for (const plugin of manifest.plugins) {
         if (globalPlugins?.[plugin]) {
           console.log(`  ✓ Plugin: ${plugin} (global)`);
-        } else if (projectPlugins?.[plugin]) {
-          console.log(`  ✓ Plugin: ${plugin} (project)`);
         } else {
-          console.log(`  ✗ Plugin missing: ${plugin}`);
-          console.log(`    → Enable via Claude Code settings or add to ~/.claude/settings.json`);
-          allGood = false;
+          const foundIn = allProjectSettings.find(s => s.enabledPlugins?.[plugin]);
+          if (foundIn) {
+            console.log(`  ✓ Plugin: ${plugin} (project)`);
+          } else {
+            console.log(`  ✗ Plugin missing: ${plugin}`);
+            console.log(`    → Enable via Claude Code settings or add to ~/.claude/settings.json`);
+            allGood = false;
+          }
         }
       }
     }
   }
 
-  // Check MCP servers
-  if (manifest.mcpServers) {
-    const rawMcp = globalLocal?.enabledMcpServers;
-    const enabledMcp = Array.isArray(rawMcp)
-      ? rawMcp
-      : (rawMcp && typeof rawMcp === 'object')
-        ? Object.keys(rawMcp).filter(k => rawMcp[k])
-        : [];
-    for (const server of manifest.mcpServers) {
-      if (enabledMcp.includes(server)) {
-        console.log(`  ✓ MCP server: ${server}`);
+  // Install and check MCP servers
+  if (manifest.mcpServers && typeof manifest.mcpServers === 'object') {
+    const mcpJson = readJsonSync(HOME_MCP_JSON) || {};
+    const mcpServers = mcpJson.mcpServers || {};
+    let mcpChanged = false;
+
+    for (const [name, config] of Object.entries(manifest.mcpServers)) {
+      if (mcpServers[name]) {
+        console.log(`  ✓ MCP server: ${name} (already in ~/.mcp.json)`);
       } else {
-        console.log(`  ✗ MCP server missing: ${server}`);
-        console.log(`    → Add "${server}" to enabledMcpServers in ~/.claude/settings.local.json`);
-        allGood = false;
+        // Strip metadata keys (prefixed with _) before writing
+        const cleanConfig = Object.fromEntries(
+          Object.entries(config).filter(([k]) => !k.startsWith('_'))
+        );
+        mcpServers[name] = cleanConfig;
+        mcpChanged = true;
+        console.log(`  ✓ MCP server: ${name} (added to ~/.mcp.json)`);
       }
+    }
+
+    if (mcpChanged) {
+      mcpJson.mcpServers = mcpServers;
+      fs.mkdirSync(path.dirname(HOME_MCP_JSON), { recursive: true });
+      fs.writeFileSync(HOME_MCP_JSON, JSON.stringify(mcpJson, null, 2) + '\n');
+    }
+
+    // Ensure servers are enabled in settings.local.json
+    const localSettings = readJsonSync(HOME_SETTINGS_LOCAL) || {};
+    const enabledServers = localSettings.enabledMcpjsonServers || [];
+    let localChanged = false;
+
+    for (const name of Object.keys(manifest.mcpServers)) {
+      if (!enabledServers.includes(name)) {
+        enabledServers.push(name);
+        localChanged = true;
+        console.log(`  ✓ MCP server: ${name} (enabled in settings.local.json)`);
+      }
+    }
+
+    if (localChanged) {
+      localSettings.enabledMcpjsonServers = enabledServers;
+      fs.mkdirSync(path.dirname(HOME_SETTINGS_LOCAL), { recursive: true });
+      fs.writeFileSync(HOME_SETTINGS_LOCAL, JSON.stringify(localSettings, null, 2) + '\n');
     }
   }
 

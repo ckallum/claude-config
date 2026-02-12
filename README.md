@@ -2,7 +2,7 @@
 
 Personal Claude Code configuration — hooks, commands, scripts, plugins, skills, and agents.
 
-**Version: 1.5**
+**Version: 1.6**
 
 ## Getting started
 
@@ -15,7 +15,7 @@ scripts/     # Standalone utility scripts + configure-claude installer
 config/      # Global settings manifest + profiles.json
 plugins/     # Claude Code plugins
 skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs)
-agents/      # Agent definitions (@context-loader, @doc-updater)
+agents/      # Agent definitions (@context-loader, @doc-updater, @browser)
 templates/   # Spec, doc, and changelog templates
 ```
 
@@ -35,7 +35,8 @@ node scripts/configure-claude.js /path/to/monorepo
 ## Agents
 
 - **`@context-loader`** — Reads all spec state, git history, and produces a prioritized briefing for the session
-- **`@doc-updater`** — Detects changed workspaces, fans out parallel sub-agents to update docs, then updates root tracking files
+- **`@doc-updater`** — Detects changed workspaces, fans out parallel sub-agents to update docs, creates architecture diagrams via Excalidraw MCP, then updates root tracking files
+- **`@browser`** — Browser automation via `agent-browser` CLI — screenshots, navigation, clicking, form filling, and visual verification
 
 ## Spec-driven Development
 
@@ -45,8 +46,19 @@ When installed with the `monorepo-root` profile, the installer creates:
 - `CHANGELOG.md` — keep-a-changelog format
 - `docs/` — documentation folder at root and each workspace
 
+## MCP Servers
+
+The installer auto-configures MCP servers defined in `config/global-settings.json`:
+- **sequential-thinking** — structured reasoning via `@modelcontextprotocol/server-sequential-thinking` (stdio, runs locally)
+- **excalidraw** — hand-drawn architecture diagrams via [excalidraw-mcp](https://github.com/excalidraw/excalidraw-mcp) (used by `@doc-updater`)
+  - Default URL points to the Excalidraw team's Vercel deployment (`excalidraw-mcp-ashy.vercel.app`)
+  - To self-host: clone the [repo](https://github.com/excalidraw/excalidraw-mcp), build, and update the `url` in `config/global-settings.json`
+
+Servers are written to `~/.mcp.json` and enabled in `~/.claude/settings.local.json` automatically.
+
 ## Changelog
 
+- **1.6** — `@browser` agent, Excalidraw MCP integration for `@doc-updater`, MCP auto-installation, monorepo workspace plugin check fix
 - **1.5** — Mono-repo support + spec-driven development: profile-based installer, agents, templates, spec-aware hooks
 - **1.4** — Added marketplace checks to `configure-claude.js`; manifest now includes `marketplaces` array
 - **1.3** — Added `configure-claude.js` installer script + `config/global-settings.json` manifest
