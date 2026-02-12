@@ -478,7 +478,11 @@ function checkGlobalSettings(manifest, projectSettingsPaths) {
       if (mcpServers[name]) {
         console.log(`  ✓ MCP server: ${name} (already in ~/.mcp.json)`);
       } else {
-        mcpServers[name] = config;
+        // Strip metadata keys (prefixed with _) before writing
+        const cleanConfig = Object.fromEntries(
+          Object.entries(config).filter(([k]) => !k.startsWith('_'))
+        );
+        mcpServers[name] = cleanConfig;
         mcpChanged = true;
         console.log(`  ✓ MCP server: ${name} (added to ~/.mcp.json)`);
       }
@@ -486,6 +490,7 @@ function checkGlobalSettings(manifest, projectSettingsPaths) {
 
     if (mcpChanged) {
       mcpJson.mcpServers = mcpServers;
+      fs.mkdirSync(path.dirname(HOME_MCP_JSON), { recursive: true });
       fs.writeFileSync(HOME_MCP_JSON, JSON.stringify(mcpJson, null, 2) + '\n');
     }
 
@@ -504,6 +509,7 @@ function checkGlobalSettings(manifest, projectSettingsPaths) {
 
     if (localChanged) {
       localSettings.enabledMcpjsonServers = enabledServers;
+      fs.mkdirSync(path.dirname(HOME_SETTINGS_LOCAL), { recursive: true });
       fs.writeFileSync(HOME_SETTINGS_LOCAL, JSON.stringify(localSettings, null, 2) + '\n');
     }
   }

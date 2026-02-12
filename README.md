@@ -49,8 +49,10 @@ When installed with the `monorepo-root` profile, the installer creates:
 ## MCP Servers
 
 The installer auto-configures MCP servers defined in `config/global-settings.json`:
-- **sequential-thinking** — structured reasoning via `@modelcontextprotocol/server-sequential-thinking`
-- **excalidraw** — hand-drawn architecture diagrams via [Excalidraw MCP](https://github.com/excalidraw/excalidraw-mcp) (used by `@doc-updater`)
+- **sequential-thinking** — structured reasoning via `@modelcontextprotocol/server-sequential-thinking` (stdio, runs locally)
+- **excalidraw** — hand-drawn architecture diagrams via [excalidraw-mcp](https://github.com/excalidraw/excalidraw-mcp) (used by `@doc-updater`)
+  - Default URL points to the Excalidraw team's Vercel deployment (`excalidraw-mcp-ashy.vercel.app`)
+  - To self-host: clone the [repo](https://github.com/excalidraw/excalidraw-mcp), build, and update the `url` in `config/global-settings.json`
 
 Servers are written to `~/.mcp.json` and enabled in `~/.claude/settings.local.json` automatically.
 

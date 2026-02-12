@@ -27,7 +27,9 @@
     },
     "excalidraw": {
       "type": "url",
-      "url": "https://excalidraw-mcp-ashy.vercel.app/mcp"
+      "url": "https://excalidraw-mcp-ashy.vercel.app/mcp",
+      "_repo": "https://github.com/excalidraw/excalidraw-mcp",
+      "_note": "Vercel deployment maintained by the Excalidraw team. Replace URL to use a self-hosted instance."
     }
   },
   "statusLine": {
