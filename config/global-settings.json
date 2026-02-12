@@ -18,9 +18,18 @@
     "frontend-design@claude-plugins-official",
     "feature-dev@claude-plugins-official"
   ],
-  "mcpServers": [
-    "sequential-thinking"
-  ],
+  "mcpServers": {
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "env": {}
+    },
+    "excalidraw": {
+      "type": "url",
+      "url": "https://excalidraw-mcp-ashy.vercel.app/mcp"
+    }
+  },
   "statusLine": {
     "type": "command",
     "command": "npx -y ccstatusline@latest",

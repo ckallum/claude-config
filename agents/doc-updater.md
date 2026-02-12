@@ -3,7 +3,7 @@ name: doc-updater
 description: "Use this agent when ending a session or after completing work on a spec. Detects which workspaces changed, fans out parallel sub-agents for each, then updates root documentation."
 model: sonnet
 color: green
-tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "Task"]
+tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "Task", "mcp__excalidraw__read_me", "mcp__excalidraw__create_view", "mcp__excalidraw__export_to_excalidraw"]
 ---
 
 # Doc Updater Agent
@@ -58,6 +58,27 @@ After workspace docs are done, update root-level files:
 #### Update root docs/ and README.md
 - Update root `docs/` folder with any cross-cutting documentation changes
 - Update root `README.md` if project structure or setup instructions changed
+
+#### Create or Update Architecture Diagrams
+
+When documentation changes affect service architecture, data flows, or system structure, create or update diagrams using the Excalidraw MCP:
+
+1. **Get the element format reference** — call `mcp__excalidraw__read_me` to load the Excalidraw cheat sheet (color palettes, element types, layout tips)
+2. **Create the diagram** — call `mcp__excalidraw__create_view` with a JSON array of Excalidraw elements describing the architecture (boxes for services, arrows for data flow, labels for names)
+3. **Export a shareable link** — call `mcp__excalidraw__export_to_excalidraw` with the diagram JSON to get a permanent excalidraw.com URL
+4. **Embed in docs** — add the shareable URL to the relevant documentation file (e.g., `docs/architecture.md`) as a link or in a diagram section
+
+**When to create diagrams:**
+- New service or workspace added to a mono-repo
+- Significant changes to inter-service communication or data flow
+- New API integrations or external dependencies
+- When existing text-only docs would benefit from a visual overview
+
+**Diagram conventions:**
+- Keep diagrams focused — one diagram per concern (architecture overview, data flow, deployment topology)
+- Use clear labels and consistent color coding (refer to the cheat sheet)
+- Store diagram links in `docs/` alongside related documentation
+- Include a brief text description above each diagram link for accessibility
 
 ### 5. Report Summary
 
