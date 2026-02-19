@@ -53,6 +53,7 @@ The installer auto-configures MCP servers defined in `config/global-settings.jso
 - **excalidraw** — hand-drawn architecture diagrams via [excalidraw-mcp](https://github.com/excalidraw/excalidraw-mcp) (used by `@doc-updater`)
   - Default URL points to the Excalidraw team's Vercel deployment (`excalidraw-mcp-ashy.vercel.app`)
   - To self-host: clone the [repo](https://github.com/excalidraw/excalidraw-mcp), build, and update the `url` in `config/global-settings.json`
+- **context7** — current, version-specific library documentation via [Context7](https://github.com/upstash/context7) (used by `/context7` skill, no API key required)
 
 Servers are written to `~/.mcp.json` and enabled in `~/.claude/settings.local.json` automatically.
 

@@ -30,6 +30,13 @@
       "url": "https://excalidraw-mcp-ashy.vercel.app/mcp",
       "_repo": "https://github.com/excalidraw/excalidraw-mcp",
       "_note": "Vercel deployment maintained by the Excalidraw team. Replace URL to use a self-hosted instance."
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "_repo": "https://github.com/upstash/context7",
+      "_note": "Fetches current library documentation. No API key required (optional for higher rate limits)."
     }
   },
   "statusLine": {
