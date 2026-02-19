@@ -14,7 +14,7 @@ commands/    # Custom slash commands
 scripts/     # Standalone utility scripts + configure-claude installer
 config/      # Global settings manifest + profiles.json (profile→plugin/skill/agent mappings)
 plugins/     # Claude Code plugins
-skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs)
+skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs, /context7)
 agents/      # Agent .md files with YAML frontmatter (@context-loader, @doc-updater, @browser)
 templates/   # Spec, doc, and changelog templates (never overwritten on re-install)
 ```
@@ -45,7 +45,7 @@ templates/   # Spec, doc, and changelog templates (never overwritten on re-insta
 
 ## Versioning
 
-Current version: **1.6**
+Current version: **1.7**
 
 When making changes to this repo:
 1. Bump the version in both CLAUDE.md and README.md
@@ -53,6 +53,7 @@ When making changes to this repo:
 
 ## Changelog
 
+- **1.7** — Context7 MCP server and `/context7` skill for current library documentation lookup
 - **1.6** — `@browser` agent (agent-browser CLI), Excalidraw MCP integration for `@doc-updater` diagrams, MCP auto-installation in configure script, monorepo workspace plugin check fix
 - **1.5** — Mono-repo support + spec-driven development: profile-based installer (`config/profiles.json`), spec/doc templates, `@context-loader` and `@doc-updater` agents, `/update-docs` skill, spec-aware session hooks
 - **1.4** — Added marketplace checks to `configure-claude.js`; manifest now includes `marketplaces` array

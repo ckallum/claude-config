@@ -16,7 +16,7 @@ Fetch up-to-date library documentation using the Context7 MCP server. This avoid
 
 If `$ARGUMENTS` is provided, parse it as a library name and optional query:
 1. Call `mcp__context7__resolve-library-id` with the library name to get the Context7 library ID
-2. Call `mcp__context7__get-library-docs` with the resolved ID and query to fetch current documentation
+2. Call `mcp__context7__query-docs` with the resolved ID and query to fetch current documentation
 3. Summarize the relevant docs and apply them to the current task
 
 Examples:
@@ -43,10 +43,10 @@ Skip Context7 when:
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
 | `mcp__context7__resolve-library-id` | Find a library's Context7 ID | `libraryName` (required) |
-| `mcp__context7__get-library-docs` | Fetch docs for a library | `libraryId` (required, e.g., `/vercel/next.js`), `query` (required), `topic` (optional) |
+| `mcp__context7__query-docs` | Fetch docs for a library | `libraryId` (required, e.g., `/vercel/next.js`), `query` (required) |
 
 ### Workflow
 
 1. **Resolve** — call `resolve-library-id` with the library name to get its ID (format: `/org/project`)
-2. **Query** — call `get-library-docs` with the ID and a specific question
+2. **Query** — call `query-docs` with the ID and a specific question
 3. **Apply** — use the returned documentation to write accurate, current code
