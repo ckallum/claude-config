@@ -2,7 +2,7 @@
 
 Personal Claude Code configuration — hooks, commands, scripts, plugins, skills, and agents.
 
-**Version: 1.6**
+**Version: 1.7**
 
 ## Getting started
 
@@ -14,7 +14,7 @@ commands/    # Custom slash commands
 scripts/     # Standalone utility scripts + configure-claude installer
 config/      # Global settings manifest + profiles.json
 plugins/     # Claude Code plugins
-skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs)
+skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs, /context7)
 agents/      # Agent definitions (@context-loader, @doc-updater, @browser)
 templates/   # Spec, doc, and changelog templates
 ```
@@ -53,11 +53,13 @@ The installer auto-configures MCP servers defined in `config/global-settings.jso
 - **excalidraw** — hand-drawn architecture diagrams via [excalidraw-mcp](https://github.com/excalidraw/excalidraw-mcp) (used by `@doc-updater`)
   - Default URL points to the Excalidraw team's Vercel deployment (`excalidraw-mcp-ashy.vercel.app`)
   - To self-host: clone the [repo](https://github.com/excalidraw/excalidraw-mcp), build, and update the `url` in `config/global-settings.json`
+- **context7** — current, version-specific library documentation via [Context7](https://github.com/upstash/context7) (used by `/context7` skill, no API key required)
 
 Servers are written to `~/.mcp.json` and enabled in `~/.claude/settings.local.json` automatically.
 
 ## Changelog
 
+- **1.7** — Context7 MCP server and `/context7` skill for current library documentation lookup
 - **1.6** — `@browser` agent, Excalidraw MCP integration for `@doc-updater`, MCP auto-installation, monorepo workspace plugin check fix
 - **1.5** — Mono-repo support + spec-driven development: profile-based installer, agents, templates, spec-aware hooks
 - **1.4** — Added marketplace checks to `configure-claude.js`; manifest now includes `marketplaces` array
