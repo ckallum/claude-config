@@ -32,14 +32,13 @@
       "_note": "Vercel deployment maintained by the Excalidraw team. Replace URL to use a self-hosted instance."
     },
     "context7": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp"],
-      "env": {
+      "type": "url",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
         "CONTEXT7_API_KEY": ""
       },
       "_repo": "https://github.com/upstash/context7",
-      "_note": "Fetches current library documentation. No API key required (optional for higher rate limits)."
+      "_note": "Fetches current library documentation. Set CONTEXT7_API_KEY for higher rate limits."
     }
   },
   "statusLine": {
