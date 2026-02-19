@@ -26,13 +26,13 @@
       "env": {}
     },
     "excalidraw": {
-      "type": "url",
+      "type": "http",
       "url": "https://excalidraw-mcp-ashy.vercel.app/mcp",
       "_repo": "https://github.com/excalidraw/excalidraw-mcp",
       "_note": "Vercel deployment maintained by the Excalidraw team. Replace URL to use a self-hosted instance."
     },
     "context7": {
-      "type": "url",
+      "type": "http",
       "url": "https://mcp.context7.com/mcp",
       "headers": {
         "CONTEXT7_API_KEY": ""

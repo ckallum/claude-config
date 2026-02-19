@@ -39,6 +39,7 @@ templates/   # Spec, doc, and changelog templates (never overwritten on re-insta
 - Profiles in `profiles.json` with an explicit `skills` array override (not merge with) the parent — when adding a new skill to `base`, also add it to `monorepo-root` and any other profile that declares its own `skills`
 - `config/global-settings.json` stores empty placeholders for API keys (e.g., `CONTEXT7_API_KEY: ""`); actual keys go in `~/.mcp.json` only — never commit real keys to the manifest
 - When writing MCP skills, verify tool names against the live server or latest README — tool names change across versions (e.g., Context7 renamed `get-library-docs` → `query-docs`)
+- Claude Code MCP schema uses `"type": "http"` for remote servers, NOT `"type": "url"` — `"url"` fails schema validation
 
 ## Testing configure-claude.js
 
