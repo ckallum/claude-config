@@ -2,7 +2,7 @@
 name: session-start
 description: Load full project context — reads all .md files, specs, changelog, and git history to produce a prioritized project briefing
 user-invocable: true
-arguments: Optional workspace name to scope context loading (e.g. "backend")
+arguments: Optional workspace name to scope context loading e.g. "backend"
 ---
 
 # /session-start
