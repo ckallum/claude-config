@@ -36,7 +36,8 @@ function matchRule(rule, tool, toolInput) {
     const value = toolInput[field] || '';
     try {
       if (!new RegExp(pattern, 'i').test(value)) return false;
-    } catch {
+    } catch (e) {
+      process.stderr.write(`[Guardian] Bad regex in rule "${rule.id}" match.${field}: ${pattern} — ${e.message}\n`);
       return false; // bad regex → skip rule
     }
   }
@@ -47,7 +48,8 @@ function matchRule(rule, tool, toolInput) {
       const value = toolInput[field] || '';
       try {
         if (new RegExp(pattern, 'i').test(value)) return false;
-      } catch {
+      } catch (e) {
+        process.stderr.write(`[Guardian] Bad regex in rule "${rule.id}" except.${field}: ${pattern} — ${e.message}\n`);
         // bad except regex → skip exception (rule still matches)
       }
     }
@@ -105,8 +107,12 @@ async function main() {
     }
   }
 
-  // Allow
-  auditLog({ ...baseEntry, decision: 'allow' });
+  // Allow — skip audit log unless GUARDIAN_LOG_LEVEL=all or sampled via GUARDIAN_LOG_ALLOW_N
+  const logLevel = process.env.GUARDIAN_LOG_LEVEL || 'warn';
+  const sampleN = Number(process.env.GUARDIAN_LOG_ALLOW_N) || 0;
+  if (logLevel === 'all' || (sampleN > 0 && Math.random() < 1 / sampleN)) {
+    auditLog({ ...baseEntry, decision: 'allow' });
+  }
   process.exit(0);
 }
 

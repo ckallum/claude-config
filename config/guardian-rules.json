@@ -139,7 +139,7 @@
       {
         "id": "deny-rm-rf-cwd",
         "tool": "Bash",
-        "match": { "command": "rm\\s+-[a-zA-Z]*rf?\\s+\\." },
+        "match": { "command": "rm\\s+-[a-zA-Z]*rf?\\s+\\.(/?\\s|/?$)" },
         "reason": "Recursive force-delete from cwd"
       },
       {
@@ -195,6 +195,18 @@
         "tool": "Edit",
         "match": { "file_path": "\\.env(\\..*)?$" },
         "reason": "Secret file edit"
+      },
+      {
+        "id": "deny-edit-credentials",
+        "tool": "Edit",
+        "match": { "file_path": "(credentials|secrets|token)\\." },
+        "reason": "Credential file write"
+      },
+      {
+        "id": "deny-edit-ssh",
+        "tool": "Edit",
+        "match": { "file_path": "(\\.ssh/|\\.pem$|\\.key$)" },
+        "reason": "SSH key/cert write"
       },
       {
         "id": "deny-random-docs",
