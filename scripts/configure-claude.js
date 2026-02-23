@@ -334,7 +334,7 @@ function installForProfile(targetDir, resolvedProfile, label) {
         ...merged.permissions,
         allow: [...new Set([...(merged.permissions?.allow || []), ...modePerms.allow])],
       };
-      console.log(`  ✓ Merged guardian permissions for "${mode}" mode (${modePerms.allow.length} rules)`);
+      console.log(`  ✓ Merged guardian permissions for "${mode}" mode (${modePerms.allow.length} allow entries)`);
     }
   }
 

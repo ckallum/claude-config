@@ -18,12 +18,12 @@ async function main() {
 
   // Only intercept git commit commands
   const command = input.tool_input?.command || '';
-  if (!/git\s+commit/.test(command)) {
+  if (!/git\s+commit(\s|$)/.test(command)) {
     process.exit(0);
   }
 
-  // Extract commit message from -m "..." or heredoc
-  const msgMatch = command.match(/-m\s+(?:"([^"]*(?:\\.[^"]*)*)"|'([^']*)'|(\S+))/);
+  // Extract commit message from -m "...", --message="...", or heredoc
+  const msgMatch = command.match(/(?:-m\s+|--message(?:=|\s+))(?:"([^"]*(?:\\.[^"]*)*)"|'([^']*)'|(\S+))/);
   const heredocMatch = command.match(/<<\s*'?EOF'?\s*\n([\s\S]*?)\nEOF/);
   const commitMsg = msgMatch ? (msgMatch[1] || msgMatch[2] || msgMatch[3] || '') : (heredocMatch ? heredocMatch[1] : '');
 
@@ -62,8 +62,8 @@ async function main() {
       if (review.diffHash === diffHash) {
         process.exit(0); // Review matches current diff
       }
-    } catch {
-      // Corrupt file — fall through to block
+    } catch (e) {
+      log(`[Review Gate] Warning: corrupt .last-review file (${e.message}) — ignoring`);
     }
   }
 
