@@ -2,7 +2,7 @@
 
 Personal Claude Code configuration — hooks, commands, scripts, plugins, skills, and agents.
 
-**Version: 1.7**
+**Version: 1.8**
 
 ## Getting started
 
@@ -14,7 +14,7 @@ commands/    # Custom slash commands
 scripts/     # Standalone utility scripts + configure-claude installer
 config/      # Global settings manifest + profiles.json
 plugins/     # Claude Code plugins
-skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs, /context7)
+skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs, /context7, /guardian)
 agents/      # Agent definitions (@context-loader, @doc-updater, @browser)
 templates/   # Spec, doc, and changelog templates
 ```
@@ -59,6 +59,7 @@ Servers are written to `~/.mcp.json` and enabled in `~/.claude/settings.local.js
 
 ## Changelog
 
+- **1.8** — Guardian autonomous approval system: smart PreToolUse hook with configurable deny/warn rules, audit logging, and mode-based permissions
 - **1.7** — Context7 MCP server and `/context7` skill for current library documentation lookup
 - **1.6** — `@browser` agent, Excalidraw MCP integration for `@doc-updater`, MCP auto-installation, monorepo workspace plugin check fix
 - **1.5** — Mono-repo support + spec-driven development: profile-based installer, agents, templates, spec-aware hooks

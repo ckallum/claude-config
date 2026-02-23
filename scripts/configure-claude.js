@@ -233,6 +233,15 @@ function installForProfile(targetDir, resolvedProfile, label) {
   copyDirSync(SCRIPTS_LIB, destLib);
   console.log(`  ✓ Copied lib scripts  → ${destLib}`);
 
+  // 2b. Copy guardian rules config
+  const guardianSrc = path.join(CONFIG_REPO, 'config', 'guardian-rules.json');
+  const guardianDest = path.join(claudeDir, 'config', 'guardian-rules.json');
+  if (fs.existsSync(guardianSrc)) {
+    fs.mkdirSync(path.join(claudeDir, 'config'), { recursive: true });
+    fs.copyFileSync(guardianSrc, guardianDest);
+    console.log(`  ✓ Copied guardian rules → ${guardianDest}`);
+  }
+
   // 3. Copy skills (only those in resolved profile)
   const destSkills = path.join(claudeDir, 'skills');
   let skillCount = 0;
@@ -314,6 +323,20 @@ function installForProfile(targetDir, resolvedProfile, label) {
     hooks: resolvedHooks,
     enabledPlugins: { ...existingSettings.enabledPlugins, ...pluginsToEnable },
   };
+
+  // Merge guardian permissions for active mode
+  const guardianConfig = readJsonSync(guardianDest);
+  if (guardianConfig?.permissions) {
+    const mode = guardianConfig.mode || 'supervised';
+    const modePerms = guardianConfig.permissions[mode];
+    if (modePerms?.allow) {
+      merged.permissions = {
+        ...merged.permissions,
+        allow: [...new Set([...(merged.permissions?.allow || []), ...modePerms.allow])],
+      };
+      console.log(`  ✓ Merged guardian permissions for "${mode}" mode (${modePerms.allow.length} rules)`);
+    }
+  }
 
   fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2) + '\n');
   console.log(`  ✓ Merged hooks into ${settingsPath}`);

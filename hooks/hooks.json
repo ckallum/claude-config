@@ -3,14 +3,14 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"(npm run dev|pnpm( run)? dev|yarn dev|bun run dev)\"",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"console.error('[Hook] BLOCKED: Dev server must run in tmux for log access');console.error('[Hook] Use: tmux new-session -d -s dev \\\"npm run dev\\\"');console.error('[Hook] Then: tmux attach -t dev');process.exit(1)\""
+            "command": "node \"${CLAUDE_CONFIG_DIR}/scripts/hooks/guardian.js\""
           }
         ],
-        "description": "Block dev servers outside tmux - ensures you can access logs"
+        "description": "Guardian: evaluate tool call risk and block dangerous operations"
       },
       {
         "matcher": "tool == \"Bash\" && tool_input.command matches \"(npm (install|test)|pnpm (install|test)|yarn (install|test)?|bun (install|test)|cargo build|make|docker|pytest|vitest|playwright)\"",
@@ -21,26 +21,6 @@
           }
         ],
         "description": "Reminder to use tmux for long-running commands"
-      },
-      {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"git push\"",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node -e \"console.error('[Hook] Review changes before push...');console.error('[Hook] Continuing with push (remove this hook to add interactive review)')\""
-          }
-        ],
-        "description": "Reminder before git push to review changes"
-      },
-      {
-        "matcher": "tool == \"Write\" && tool_input.file_path matches \"\\\\.(md|txt)$\" && !(tool_input.file_path matches \"README\\\\.md|CLAUDE\\\\.md|AGENTS\\\\.md|CONTRIBUTING\\\\.md|SPECLOG\\\\.md|CHANGELOG\\\\.md|\\\\.claude/specs/\")",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node -e \"const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path||'';if(/\\.(md|txt)$/.test(p)&&!/(README|CLAUDE|AGENTS|CONTRIBUTING|SPECLOG|CHANGELOG)\\.md$/.test(p)&&!/\\.claude\\/specs\\//.test(p)){console.error('[Hook] BLOCKED: Unnecessary documentation file creation');console.error('[Hook] File: '+p);console.error('[Hook] Use README.md for documentation instead');process.exit(1)}console.log(d)})\""
-          }
-        ],
-        "description": "Block creation of random .md files - keeps docs consolidated"
       },
       {
         "matcher": "tool == \"Edit\" || tool == \"Write\"",
