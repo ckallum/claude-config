@@ -2,7 +2,7 @@
 
 Personal Claude Code configuration — hooks, commands, scripts, plugins, skills, and agents.
 
-**Version: 1.8**
+**Version: 1.9**
 
 ## Getting started
 
@@ -15,7 +15,7 @@ scripts/     # Standalone utility scripts + configure-claude installer
 config/      # Global settings manifest + profiles.json
 plugins/     # Claude Code plugins
 skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs, /context7, /guardian)
-agents/      # Agent definitions (@context-loader, @doc-updater, @browser)
+agents/      # Agent definitions (@context-loader, @doc-updater, @browser, @code-reviewer)
 templates/   # Spec, doc, and changelog templates
 ```
 
@@ -37,6 +37,7 @@ node scripts/configure-claude.js /path/to/monorepo
 - **`@context-loader`** — Reads all spec state, git history, and produces a prioritized briefing for the session
 - **`@doc-updater`** — Detects changed workspaces, fans out parallel sub-agents to update docs, creates architecture diagrams via Excalidraw MCP, then updates root tracking files
 - **`@browser`** — Browser automation via `agent-browser` CLI — screenshots, navigation, clicking, form filling, and visual verification
+- **`@code-reviewer`** — Reviews staged git changes against CLAUDE.md conventions and codebase patterns; writes a review stamp on PASS to unlock the commit gate
 
 ## Spec-driven Development
 
@@ -59,6 +60,7 @@ Servers are written to `~/.mcp.json` and enabled in `~/.claude/settings.local.js
 
 ## Changelog
 
+- **1.9** — Pre-commit review gate: `review-gate.js` hook + `@code-reviewer` agent for convention-aware code reviews before commits
 - **1.8** — Guardian autonomous approval system: smart PreToolUse hook with configurable deny/warn rules, audit logging, and mode-based permissions
 - **1.7** — Context7 MCP server and `/context7` skill for current library documentation lookup
 - **1.6** — `@browser` agent, Excalidraw MCP integration for `@doc-updater`, MCP auto-installation, monorepo workspace plugin check fix

@@ -13,6 +13,16 @@
         "description": "Guardian: evaluate tool call risk and block dangerous operations"
       },
       {
+        "matcher": "tool == \"Bash\" && tool_input.command matches \"git commit\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_CONFIG_DIR}/scripts/hooks/review-gate.js\""
+          }
+        ],
+        "description": "Review gate: require code review before commits"
+      },
+      {
         "matcher": "tool == \"Bash\" && tool_input.command matches \"(npm (install|test)|pnpm (install|test)|yarn (install|test)?|bun (install|test)|cargo build|make|docker|pytest|vitest|playwright)\"",
         "hooks": [
           {
