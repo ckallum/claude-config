@@ -14,8 +14,8 @@ commands/    # Custom slash commands
 scripts/     # Standalone utility scripts + configure-claude installer
 config/      # Global settings manifest + profiles.json (profile→plugin/skill/agent mappings)
 plugins/     # Claude Code plugins
-skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs, /context7)
-agents/      # Agent .md files with YAML frontmatter (@context-loader, @doc-updater, @browser)
+skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs, /context7, /guardian)
+agents/      # Agent .md files with YAML frontmatter (@context-loader, @doc-updater, @browser, @code-reviewer)
 templates/   # Spec, doc, and changelog templates (never overwritten on re-install)
 ```
 
@@ -40,6 +40,7 @@ templates/   # Spec, doc, and changelog templates (never overwritten on re-insta
 - `config/global-settings.json` stores empty placeholders for API keys (e.g., `CONTEXT7_API_KEY: ""`); actual keys go in `~/.mcp.json` only — never commit real keys to the manifest
 - When writing MCP skills, verify tool names against the live server or latest README — tool names change across versions (e.g., Context7 renamed `get-library-docs` → `query-docs`)
 - Claude Code MCP schema uses `"type": "http"` for remote servers, NOT `"type": "url"` — `"url"` fails schema validation
+- Review gate blocks commits without `@code-reviewer` approval — bypass with `[skip-review]` in commit message, `docs:`/`chore:`/`style:` prefix, or md-only changes
 
 ## Testing configure-claude.js
 
@@ -49,7 +50,7 @@ templates/   # Spec, doc, and changelog templates (never overwritten on re-insta
 
 ## Versioning
 
-Current version: **1.7**
+Current version: **1.9**
 
 When making changes to this repo:
 1. Bump the version in both CLAUDE.md and README.md
@@ -57,6 +58,8 @@ When making changes to this repo:
 
 ## Changelog
 
+- **1.9** — Pre-commit review gate: `review-gate.js` hook + `@code-reviewer` agent for convention-aware code reviews before commits
+- **1.8** — Guardian autonomous approval system: smart PreToolUse hook with configurable deny/warn rules, audit logging, and mode-based permissions
 - **1.7** — Context7 MCP server and `/context7` skill for current library documentation lookup
 - **1.6** — `@browser` agent (agent-browser CLI), Excalidraw MCP integration for `@doc-updater` diagrams, MCP auto-installation in configure script, monorepo workspace plugin check fix
 - **1.5** — Mono-repo support + spec-driven development: profile-based installer (`config/profiles.json`), spec/doc templates, `@context-loader` and `@doc-updater` agents, `/update-docs` skill, spec-aware session hooks

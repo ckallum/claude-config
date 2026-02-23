@@ -27,8 +27,8 @@
         "security-guidance@claude-plugins-official",
         "feature-dev@claude-plugins-official"
       ],
-      "skills": ["configure-claude", "strategic-compact", "spec-interview", "session-start", "context7"],
-      "agents": []
+      "skills": ["configure-claude", "strategic-compact", "spec-interview", "session-start", "context7", "guardian"],
+      "agents": ["code-reviewer"]
     },
     "typescript": {
       "extends": "base",
@@ -41,7 +41,7 @@
     "frontend": {
       "extends": "typescript",
       "plugins": ["frontend-design@claude-plugins-official"],
-      "agents": ["browser"]
+      "agents": ["browser", "code-reviewer"]
     },
     "backend": {
       "extends": "base",
@@ -49,8 +49,8 @@
     },
     "monorepo-root": {
       "extends": "base",
-      "skills": ["configure-claude", "strategic-compact", "spec-interview", "update-docs", "session-start", "context7"],
-      "agents": ["context-loader", "doc-updater", "browser"],
+      "skills": ["configure-claude", "strategic-compact", "spec-interview", "update-docs", "session-start", "context7", "guardian"],
+      "agents": ["context-loader", "doc-updater", "browser", "code-reviewer"],
       "templates": ["specs"]
     }
   }
