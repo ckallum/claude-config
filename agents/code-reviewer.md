@@ -67,7 +67,7 @@ Check the staged diff against:
 If all checks pass:
 
 1. Print a structured summary:
-   ```
+   ```text
    ## Review: PASS
 
    **Files reviewed:** <list>
@@ -100,7 +100,7 @@ If all checks pass:
 If any issues are found:
 
 1. Print findings with `file:line` references and fix suggestions:
-   ```
+   ```text
    ## Review: BLOCKED
 
    ### Findings

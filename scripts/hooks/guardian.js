@@ -30,6 +30,7 @@ function getMode(config) {
 
 function matchRule(rule, tool, toolInput) {
   if (rule.tool !== tool) return false;
+  if (!rule.match || typeof rule.match !== 'object') return false;
 
   // All match patterns must hit
   for (const [field, pattern] of Object.entries(rule.match)) {

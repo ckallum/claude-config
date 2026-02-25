@@ -13,7 +13,7 @@
         "description": "Guardian: evaluate tool call risk and block dangerous operations"
       },
       {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"git commit\"",
+        "matcher": "tool == \"Bash\" && tool_input.command matches \"git commit(\\\\s|$)\"",
         "hooks": [
           {
             "type": "command",
