@@ -14,7 +14,7 @@ commands/    # Custom slash commands
 scripts/     # Standalone utility scripts + configure-claude installer
 config/      # Global settings manifest + profiles.json (profile→plugin/skill/agent mappings)
 plugins/     # Claude Code plugins
-skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs, /context7, /guardian)
+skills/      # Custom skills (/configure-claude, /strategic-compact, /spec-interview, /update-docs, /context7, /guardian, /plan, /plan-ceo, /ship, /retro)
 agents/      # Agent .md files with YAML frontmatter (@context-loader, @doc-updater, @browser, @code-reviewer)
 templates/   # Spec, doc, and changelog templates (never overwritten on re-install)
 ```
@@ -50,7 +50,7 @@ templates/   # Spec, doc, and changelog templates (never overwritten on re-insta
 
 ## Versioning
 
-Current version: **1.9**
+Current version: **2.0**
 
 When making changes to this repo:
 1. Bump the version in both CLAUDE.md and README.md
@@ -58,6 +58,7 @@ When making changes to this repo:
 
 ## Changelog
 
+- **2.0** — Consolidated skills: `/plan` (interview + brainstorm + review), `/plan-ceo` (founder-mode plan review), `/ship` (automated test + review + PR pipeline), `/retro` (weekly engineering retrospective with trend tracking)
 - **1.9** — Pre-commit review gate: `review-gate.js` hook + `@code-reviewer` agent for convention-aware code reviews before commits
 - **1.8** — Guardian autonomous approval system: smart PreToolUse hook with configurable deny/warn rules, audit logging, and mode-based permissions
 - **1.7** — Context7 MCP server and `/context7` skill for current library documentation lookup
