@@ -42,7 +42,7 @@ If a path is provided in `$ARGUMENTS`, use it. Otherwise, look for files in `.cl
 Before interviewing, gather context:
 ```bash
 git log --oneline -20                    # Recent history
-git diff main --stat                     # In-flight changes
+git diff origin/main --stat              # In-flight changes
 ```
 Read CLAUDE.md, SPECLOG.md, TODO.md, and any related spec files. Understand what already exists and what's planned.
 
@@ -114,7 +114,7 @@ Update SPECLOG.md with the new spec entry.
 Before reviewing anything, gather context:
 ```bash
 git log --oneline -30
-git diff main --stat
+git diff origin/main --stat
 git stash list
 ```
 Read CLAUDE.md, TODO.md, SPECLOG.md, and the spec being reviewed. Map:
@@ -141,7 +141,7 @@ Then ask if the user wants:
 After scope is agreed, dispatch **4 parallel review agents** in a single message using the Agent tool. Each agent reads the spec/plan independently and returns findings. This runs all reviews concurrently instead of sequentially.
 
 **Agent 1 — Architecture Review:**
-```
+```text
 prompt: "You are reviewing a technical plan. Read CLAUDE.md for project conventions, then read the spec at [SPEC_PATH].
 
 Review the plan's architecture:
@@ -158,7 +158,7 @@ description: "Architecture review"
 ```
 
 **Agent 2 — Code Quality + Simplify Review:**
-```
+```text
 prompt: "You are reviewing a technical plan. Read CLAUDE.md for project conventions, then read the spec at [SPEC_PATH].
 
 Review code quality AND simplification opportunities:
@@ -173,7 +173,7 @@ description: "Code quality + simplify"
 ```
 
 **Agent 3 — Test Review:**
-```
+```text
 prompt: "You are reviewing a technical plan. Read CLAUDE.md for project conventions, then read the spec at [SPEC_PATH].
 
 Diagram all new things this plan introduces:
@@ -193,7 +193,7 @@ description: "Test review"
 ```
 
 **Agent 4 — Performance Review:**
-```
+```text
 prompt: "You are reviewing a technical plan. Read CLAUDE.md for project conventions, then read the spec at [SPEC_PATH].
 
 Review performance:
@@ -241,7 +241,7 @@ ASCII diagrams for any non-trivial data flow, state machine, or pipeline.
 For each new codepath: one realistic failure, whether a test covers it, whether error handling exists, whether the user would see a clear error or silent failure. Any failure with no test AND no error handling AND silent -> **critical gap**.
 
 ### Completion summary
-```
+```text
   Step 0: Scope Challenge (user chose: ___)
   Architecture Review:  ___ issues found
   Code Quality Review:  ___ issues found

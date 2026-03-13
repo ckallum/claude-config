@@ -190,7 +190,7 @@ If time window is 14+ days, split into weekly buckets and show:
 Count consecutive days with at least 1 commit to origin/main:
 
 ```bash
-git log origin/main --format="%ad" --date=format:"%Y-%m-%d" | sort -u
+git log origin/main --author="$RETRO_AUTHOR" --format="%ad" --date=format:"%Y-%m-%d" | sort -u
 ```
 
 Count backward from today. Display: "Shipping streak: 47 consecutive days"

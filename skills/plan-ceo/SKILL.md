@@ -65,7 +65,7 @@ prompt: "You are auditing a project's state before a CEO-level plan review.
 
 1. Run these commands:
    git log --oneline -30
-   git diff main --stat
+   git diff origin/main --stat
    git stash list
    git branch -a | head -20
 
@@ -103,7 +103,7 @@ run_in_background: true
 
 ### 0C. Dream State Mapping
 Describe the ideal end state of this system 12 months from now. Does this plan move toward that state or away from it?
-```
+```text
   CURRENT STATE                  THIS PLAN                  12-MONTH IDEAL
   [describe]          --->       [describe delta]    --->    [describe target]
 ```
@@ -159,7 +159,7 @@ Required ASCII diagram: full system architecture showing new components and thei
 
 ### Section 2: Error Map
 For every new API route, service function, or background job step that can fail, fill in:
-```
+```text
   METHOD/CODEPATH          | WHAT CAN GO WRONG           | ERROR TYPE
   -------------------------|-----------------------------|-----------------
   POST /api/foo            | Auth failure                | 401 Unauthorized
@@ -186,7 +186,7 @@ Evaluate:
 
 ### Section 4: Data Flow & Interaction Edge Cases
 For every new data flow, diagram:
-```
+```text
   INPUT --> VALIDATION --> TRANSFORM --> PERSIST --> OUTPUT
     |            |              |            |           |
     v            v              v            v           v
@@ -195,7 +195,7 @@ For every new data flow, diagram:
 ```
 
 For every new user-visible interaction:
-```
+```text
   INTERACTION          | EDGE CASE              | HANDLED?
   ---------------------|------------------------|----------
   Form submission      | Double-click submit    | ?
@@ -218,7 +218,7 @@ Evaluate:
 
 ### Section 6: Test Review
 Diagram every new thing this plan introduces:
-```
+```text
   NEW UX FLOWS:        [list each]
   NEW API ROUTES:      [list each]
   NEW DATA FLOWS:      [list each]
@@ -285,7 +285,7 @@ Where this plan leaves us relative to the 12-month ideal.
 Complete table of every method that can fail, every error type, handled status, action, user impact.
 
 ### Failure Modes Registry
-```
+```text
   CODEPATH | FAILURE MODE   | HANDLED? | TEST? | USER SEES?     | LOGGED?
 ```
 Any row with HANDLED=N, TEST=N, USER SEES=Silent -> **CRITICAL GAP**.
@@ -305,7 +305,7 @@ At least 5 "bonus chunk" opportunities (<30 min each). Each as its own AskUserQu
 5. Deployment sequence
 
 ### Completion Summary
-```
+```text
   +====================================================================+
   |            CEO PLAN REVIEW — COMPLETION SUMMARY                     |
   +====================================================================+
