@@ -8,9 +8,12 @@ description: |
   (strip to essentials).
 allowed-tools:
   - Read
+  - Write
+  - Edit
   - Grep
   - Glob
   - Bash
+  - Agent
   - AskUserQuestion
 ---
 
@@ -51,26 +54,41 @@ Do NOT make any code changes. Do NOT start implementation. Your only job right n
 Step 0 > System audit > Error map > Test diagram > Failure modes > Opinionated recommendations > Everything else.
 Never skip Step 0, the system audit, or the failure modes section.
 
-## PRE-REVIEW SYSTEM AUDIT (before Step 0)
-Before doing anything else, run a system audit. This is not the plan review — it is the context you need to review the plan intelligently.
-Run the following commands:
-```
-git log --oneline -30                          # Recent history
-git diff main --stat                           # What's already changed
-git stash list                                 # Any stashed work
-```
-Then read CLAUDE.md, TODO.md, SPECLOG.md, and any existing spec files relevant to this plan. Map:
-* What is the current system state?
-* What is already in flight (other open PRs, branches)?
-* What are the existing known pain points most relevant to this plan?
-* Are there existing spec files in `.claude/specs/` that overlap with this plan?
+## PRE-REVIEW SYSTEM AUDIT — BACKGROUND AGENT
 
-### Retrospective Check
-Check the git log for this branch. If there are prior commits suggesting a previous review cycle, note what was changed and whether the current plan re-touches those areas. Be MORE aggressive reviewing areas that were previously problematic.
+Before doing anything else, dispatch a **background system audit agent** while you begin Step 0. This runs the audit concurrently with the initial scope challenge conversation.
 
-### Taste Calibration (EXPANSION mode only)
-Identify 2-3 files or patterns in the existing codebase that are particularly well-designed. Note them as style references. Also note 1-2 anti-patterns to avoid repeating.
-Report findings before proceeding to Step 0.
+Launch this agent with `run_in_background: true`:
+
+```
+prompt: "You are auditing a project's state before a CEO-level plan review.
+
+1. Run these commands:
+   git log --oneline -30
+   git diff main --stat
+   git stash list
+   git branch -a | head -20
+
+2. Read these files: CLAUDE.md, TODO.md, SPECLOG.md
+
+3. List all spec directories in .claude/specs/ and read any that overlap with the plan being reviewed.
+
+4. Retrospective check: check the git log for the current branch. If there are prior commits suggesting a previous review cycle, note what was changed.
+
+5. Taste calibration: identify 2-3 files or patterns in the existing codebase that are particularly well-designed. Also note 1-2 anti-patterns.
+
+Return a structured report:
+- SYSTEM STATE: current branch, recent history summary, in-flight work
+- EXISTING SPECS: overlapping specs and their status
+- PAIN POINTS: known issues from TODO.md relevant to the plan
+- RETROSPECTIVE: prior review cycle findings (if any)
+- TASTE CALIBRATION: style references and anti-patterns
+- EXISTING CODE: code that already partially solves problems in this plan"
+description: "System audit"
+run_in_background: true
+```
+
+**Do NOT wait for this agent.** Proceed immediately to Step 0. When the agent completes, incorporate its findings into the review. If the agent hasn't returned by Section 1, check for its results then.
 
 ## Step 0: Nuclear Scope Challenge + Mode Selection
 

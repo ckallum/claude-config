@@ -14,6 +14,8 @@ allowed-tools:
   - Grep
   - Glob
   - Bash
+  - Skill
+  - Agent
   - AskUserQuestion
 ---
 
@@ -52,7 +54,7 @@ Interview guidelines:
 - **Do ask about:** hidden complexity, conflicting requirements, unstated assumptions, failure modes, edge cases, scaling concerns, security implications, data model subtleties, UX micro-interactions, state management tradeoffs, migration paths, backwards compatibility, error handling strategy, and integration boundaries.
 - **Be specific.** Reference concrete parts of the spec. Instead of "how should errors work?", ask "when this background job fails after processing 3 of 10 items, what should the user see?"
 - **Go deep on answers.** Follow up on interesting responses. If the user says "we'll use a queue", ask about retry policy, idempotency, ordering guarantees, dead letter handling.
-- **Cover multiple dimensions per round.** Use multi-question AskUserQuestion calls (up to 4 questions) to keep the interview moving.
+- **Cover multiple dimensions per round.** Keep each AskUserQuestion focused on one decision, but cover multiple topics across a round to keep the interview moving.
 - **Provide informed options.** When asking about tradeoffs, present concrete options with pros/cons.
 - **Reference existing patterns.** Check what similar features in the codebase do and ask whether this should follow the same pattern or diverge.
 
@@ -134,60 +136,92 @@ Then ask if the user wants:
 
 **Critical: If the user does not select SCOPE REDUCTION, respect that fully.** Your job becomes making the plan succeed. Raise scope concerns once — after that, commit.
 
-### Section 1: Architecture Review
-Evaluate:
-* Overall system design — pages, API routes, backend services, DB schema, background jobs.
-* Dependency graph and coupling concerns.
-* Data flow patterns and potential bottlenecks.
-* Multi-tenancy: every new table/query must scope appropriately.
-* Security: auth boundaries, authorization checks, API surface.
-* For each new codepath or integration, describe one realistic production failure and whether the plan accounts for it.
-* ASCII diagrams for non-trivial flows.
+### Parallel Review — DISPATCH 4 AGENTS
 
-**STOP.** AskUserQuestion individually per issue. Present options, recommend, explain WHY. Do NOT batch. Only proceed after ALL issues resolved.
+After scope is agreed, dispatch **4 parallel review agents** in a single message using the Agent tool. Each agent reads the spec/plan independently and returns findings. This runs all reviews concurrently instead of sequentially.
 
-### Section 2: Code Quality Review
-Evaluate:
-* Code organization — fits existing patterns in CLAUDE.md?
-* DRY violations — be aggressive.
-* Error handling patterns and missing edge cases.
-* Over-engineering or under-engineering.
-* Existing conventions from the codebase.
-
-**STOP.** AskUserQuestion individually per issue.
-
-### Section 3: Test Review
-Diagram all new things this plan introduces:
+**Agent 1 — Architecture Review:**
 ```
+prompt: "You are reviewing a technical plan. Read CLAUDE.md for project conventions, then read the spec at [SPEC_PATH].
+
+Review the plan's architecture:
+* Overall system design — pages, API routes, backend services, DB schema, background jobs
+* Dependency graph and coupling concerns
+* Data flow patterns and bottlenecks
+* Multi-tenancy: every new table/query must scope appropriately
+* Security: auth boundaries, authorization checks, API surface
+* For each new codepath, describe one realistic production failure
+* ASCII diagrams for non-trivial flows
+
+Return a numbered list of issues. For each: file/component reference, problem description, 2-3 concrete options with your recommendation and WHY. Mark severity as CRITICAL or INFORMATIONAL."
+description: "Architecture review"
+```
+
+**Agent 2 — Code Quality + Simplify Review:**
+```
+prompt: "You are reviewing a technical plan. Read CLAUDE.md for project conventions, then read the spec at [SPEC_PATH].
+
+Review code quality AND simplification opportunities:
+* Code organization — fits existing patterns in CLAUDE.md?
+* DRY violations — be aggressive
+* Error handling patterns and missing edge cases
+* Over-engineering or under-engineering
+* Simplification: identify any planned code that could reuse existing utilities, be made simpler, or follow existing patterns more closely. Reference specific existing files/functions that could be leveraged.
+
+Return a numbered list of issues. For each: file/component reference, problem description, 2-3 concrete options with your recommendation and WHY."
+description: "Code quality + simplify"
+```
+
+**Agent 3 — Test Review:**
+```
+prompt: "You are reviewing a technical plan. Read CLAUDE.md for project conventions, then read the spec at [SPEC_PATH].
+
+Diagram all new things this plan introduces:
   NEW UX FLOWS:        [list each]
   NEW API ROUTES:      [list each]
   NEW DATA FLOWS:      [list each]
   NEW BACKGROUND JOBS: [list each]
   NEW ERROR PATHS:     [list each]
-```
-For each: what test covers it?
-For each new item: happy path test, failure path test, edge case test.
 
-Test pyramid: many unit, fewer integration, few E2E?
+For each: what test covers it? (unit / integration / E2E)
+For each new item: happy path test, failure path test, edge case test.
+Test pyramid check: many unit, fewer integration, few E2E?
 Flakiness risk: tests depending on timing, external services, read-after-write?
 
-**STOP.** AskUserQuestion individually per issue.
+Return the diagram plus a numbered list of test gaps with recommendations."
+description: "Test review"
+```
 
-### Section 4: Performance Review
-Evaluate:
-* N+1 queries. Every new DB query in a loop: batch or join?
-* Database indexes for new query patterns.
-* Background job sizing: worst-case payload, runtime, retry behavior.
-* Parallelization opportunities for independent operations.
-* Caching opportunities.
+**Agent 4 — Performance Review:**
+```
+prompt: "You are reviewing a technical plan. Read CLAUDE.md for project conventions, then read the spec at [SPEC_PATH].
 
-**STOP.** AskUserQuestion individually per issue.
+Review performance:
+* N+1 queries — every new DB query in a loop: batch or join?
+* Database indexes for new query patterns
+* Parallelization opportunities for independent operations
+* Background job sizing: worst-case payload, runtime, retry behavior
+* Caching opportunities
 
-## CRITICAL RULE — How to ask questions
+Return a numbered list of issues with recommendations."
+description: "Performance review"
+```
+
+### Process Agent Results
+
+After all 4 agents return, merge their findings into a unified list. For each issue across all agents, present to the user via AskUserQuestion individually — one issue per call. Present options, recommend, explain WHY. Do NOT batch.
+
+Process in priority order: Architecture issues first, then Quality+Simplify, then Tests, then Performance. Within each section, CRITICAL issues before INFORMATIONAL.
+
+**STOP after each issue.** Only proceed after ALL issues resolved.
+
+## CRITICAL RULE — How to ask questions (REVIEW mode)
 Every AskUserQuestion MUST: (1) present 2-3 concrete lettered options, (2) state which option you recommend FIRST, (3) explain in 1-2 sentences WHY. No batching multiple issues. No yes/no questions. Open-ended questions only when genuinely ambiguous.
 
 **Lead with your recommendation.** "Do B. Here's why:" Be opinionated.
 **Escape hatch:** If a section has no issues, say so and move on.
+
+In INTERVIEW and BRAINSTORM modes, AskUserQuestion can be more open-ended and exploratory — the strict option/recommendation format is not required.
 
 ## Required Outputs (REVIEW mode)
 

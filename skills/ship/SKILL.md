@@ -13,6 +13,8 @@ allowed-tools:
   - Edit
   - Grep
   - Glob
+  - Skill
+  - Agent
   - AskUserQuestion
 ---
 
@@ -63,7 +65,7 @@ If `$ARGUMENTS` contains "clean":
 
 2. Run `git status` (never use `-uall`). Uncommitted changes are always included.
 
-3. Run `git diff main...HEAD --stat` and `git log main..HEAD --oneline` to understand what's being shipped.
+3. Run `git diff origin/main...HEAD --stat` and `git log origin/main..HEAD --oneline` to understand what's being shipped.
 
 ---
 
@@ -81,15 +83,19 @@ git fetch origin main && git merge origin/main --no-edit
 
 ---
 
-## Step 3: Run tests (on merged code)
+## Step 3: Run tests (on merged code) — PARALLEL AGENTS
 
-Run tests based on what changed. Check `git diff origin/main --name-only` to determine scope.
+Check `git diff origin/main --name-only` to determine which areas changed. Read CLAUDE.md and package.json to discover the project's test commands.
 
-Read CLAUDE.md and package.json to discover the project's test commands. Run the appropriate test suites for the changed files.
+Dispatch **parallel sub-agents** for each applicable test suite using the Agent tool. Launch all agents in a **single message** (multiple Agent tool calls). Each agent should run the appropriate test command for the changed area and report pass/fail count and any failures.
 
-Run independent test suites in parallel where possible.
+Example agent prompts (adapt to the project's actual test commands):
+```
+prompt: "Run the test suite: <test-command>. Report pass/fail count and any failures."
+description: "<area> tests"
+```
 
-After all complete, check pass/fail.
+Wait for all test agents to complete. Collect results.
 
 **If any test fails:** Show the failures and **STOP**. Do not proceed.
 
@@ -97,13 +103,34 @@ After all complete, check pass/fail.
 
 ---
 
-## Step 4: Pre-Landing Review
+## Step 4: Pre-Landing Review + Simplify — PARALLEL AGENTS
 
-Review the diff for structural issues that tests don't catch.
+After tests pass, dispatch **two parallel agents** in a single message:
 
-1. Run `git diff origin/main` to get the full diff.
+**Agent A — Pre-landing review:**
+```
+prompt: "Run a pre-landing code review on the diff between origin/main and HEAD. Run `git diff origin/main` to get the full diff. Apply a two-pass review:
 
-2. Apply a two-pass review:
+Pass 1 (CRITICAL): SQL/data safety, auth boundary violations, background job safety, XSS, file upload issues.
+Pass 2 (INFORMATIONAL): Missing error handling, console.log/debug statements, ORM gotchas, framework gotchas, convention violations.
+
+Output format: 'Pre-Landing Review: N issues (X critical, Y informational)' followed by findings with file:line references and suggested fixes. Categorize each as CRITICAL or INFORMATIONAL."
+description: "Pre-landing review"
+```
+
+**Agent B — Code simplification:**
+```
+prompt: "Review all files changed between origin/main and HEAD (run `git diff origin/main --name-only` to find them). For each changed file, check for: code that could be reused from existing utilities, unnecessarily complex logic that could be simplified, redundant code, inconsistent patterns vs the rest of the codebase. Read CLAUDE.md conventions section first. Output a list of specific simplification suggestions with file:line references. If a suggestion is safe and obvious, apply the fix directly using Edit. Only apply fixes that preserve exact functionality."
+description: "Simplify changed code"
+```
+
+Wait for both agents. Process results:
+
+1. **Simplify agent results:** If it made edits, stage them. If it only suggested changes, apply the safe ones.
+
+2. **Review agent results:** Parse findings into CRITICAL and INFORMATIONAL.
+
+3. Apply the two-pass review logic:
 
 **Pass 1 (CRITICAL):**
 - SQL/Data safety: raw SQL interpolation, missing tenant scoping, TOCTOU races
@@ -140,8 +167,8 @@ Review the diff for structural issues that tests don't catch.
 1. Read `CHANGELOG.md` header to know the format. If no CHANGELOG.md exists, skip this step.
 
 2. Auto-generate entries from **ALL commits on the branch**:
-   - Use `git log main..HEAD --oneline` for every commit being shipped
-   - Use `git diff main...HEAD` for the full diff
+   - Use `git log origin/main..HEAD --oneline` for every commit being shipped
+   - Use `git diff origin/main...HEAD` for the full diff
    - Categorize into: `### Added`, `### Changed`, `### Fixed`
    - Write concise, descriptive bullet points
    - Insert under `## [Unreleased]` section

@@ -10,6 +10,7 @@ allowed-tools:
   - Read
   - Write
   - Glob
+  - Agent
 ---
 
 # /retro — Weekly Engineering Retrospective
@@ -39,31 +40,56 @@ Usage: /retro [window]
   /retro compare 14d  — compare with explicit window
 ```
 
-### Step 1: Gather Raw Data
+### Step 1: Gather Raw Data — PARALLEL AGENTS
 
-First, fetch origin to ensure we have the latest:
+First, fetch origin:
 ```bash
 git fetch origin main --quiet
 ```
 
-Run ALL of these git commands in parallel (they are independent):
+Resolve the retrospective subject first. For a personal retro (default), scope all queries to the current user:
 
 ```bash
-# 1. All commits in window with timestamps, subject, hash, files changed
-git log origin/main --since="<window>" --format="%H|%ai|%s" --shortstat
-
-# 2. Per-commit test vs total LOC breakdown
-git log origin/main --since="<window>" --format="COMMIT:%H" --numstat
-
-# 3. Commit timestamps for session detection
-git log origin/main --since="<window>" --format="%at|%ai|%s" | sort -n
-
-# 4. Files most frequently changed (hotspot analysis)
-git log origin/main --since="<window>" --format="" --name-only | grep -v '^$' | sort | uniq -c | sort -rn
-
-# 5. PR numbers from commit messages
-git log origin/main --since="<window>" --format="%s" | grep -oE '#[0-9]+' | sed 's/^#//' | sort -n | uniq | sed 's/^/#/'
+RETRO_AUTHOR="$(git config user.email)"
 ```
+
+Then dispatch **3 parallel agents** in a single message to gather data concurrently. Pass the author email to each agent.
+
+**Agent 1 — Commit metrics + LOC breakdown:**
+```
+prompt: "Gather git commit metrics for the retro. Run these commands and return ALL raw output:
+
+1. git log origin/main --author='<RETRO_AUTHOR>' --since='<window>' --format='%H|%ai|%s' --shortstat
+2. git log origin/main --author='<RETRO_AUTHOR>' --since='<window>' --format='COMMIT:%H' --numstat
+3. git log origin/main --author='<RETRO_AUTHOR>' --since='<window>' --format='%s' | grep -oE '#[0-9]+' | sed 's/^#//' | sort -n | uniq | sed 's/^/#/'
+
+Return the raw output of all three commands, clearly labeled."
+description: "Commit metrics"
+```
+
+**Agent 2 — Time patterns + sessions + streak:**
+```
+prompt: "Gather git timing data for the retro. Run these commands and return ALL raw output:
+
+1. git log origin/main --author='<RETRO_AUTHOR>' --since='<window>' --format='%at|%ai|%s' | sort -n
+2. git log origin/main --author='<RETRO_AUTHOR>' --format='%ad' --date=format:'%Y-%m-%d' | sort -u
+
+For the streak calculation: count consecutive days backward from today that have at least one commit by this author. Return the raw output and the streak count."
+description: "Time patterns + streak"
+```
+
+**Agent 3 — Hotspots + history:**
+```
+prompt: "Gather file hotspot data and retro history. Run these commands:
+
+1. git log origin/main --author='<RETRO_AUTHOR>' --since='<window>' --format='' --name-only | grep -v '^$' | sort | uniq -c | sort -rn | head -20
+2. ls -t .context/retros/*.json 2>/dev/null | head -1
+
+If a prior retro JSON exists, read it and return the contents. Return all raw output."
+description: "Hotspots + history"
+```
+
+Wait for all 3 agents. Collect their raw output, then proceed to compute metrics from the combined data.
 
 ### Step 2: Compute Metrics
 
@@ -276,7 +302,7 @@ Small, practical, realistic. Each takes <5 minutes to adopt.
 
 When `/retro compare` (or `/retro compare 14d`):
 
-1. Compute metrics for current window using `--since="7 days ago"`
+1. Compute metrics for the current parsed window using `--since="<window>"`
 2. Compute metrics for prior same-length window using both `--since` and `--until` to avoid overlap
 3. Show side-by-side comparison table with deltas and arrows
 4. Write brief narrative on biggest improvements and regressions
