@@ -380,6 +380,7 @@ function installCcstatuslineConfig(manifest) {
 function installOnly(targetDir, onlySkills, onlyAgents) {
   const claudeDir = path.join(targetDir, '.claude');
   fs.mkdirSync(claudeDir, { recursive: true });
+  const missing = [];
 
   // Install specified skills
   if (onlySkills.length > 0) {
@@ -393,6 +394,7 @@ function installOnly(targetDir, onlySkills, onlyAgents) {
         console.log(`  ✓ Installed skill: ${skillName}`);
       } else {
         console.log(`  ✗ Skill not found: ${skillName}`);
+        missing.push(`skill:${skillName}`);
       }
     }
     console.log(`  → ${count} skill(s) installed to ${destSkills}`);
@@ -411,6 +413,7 @@ function installOnly(targetDir, onlySkills, onlyAgents) {
         console.log(`  ✓ Installed agent: ${agentName}`);
       } else {
         console.log(`  ✗ Agent not found: ${agentName}`);
+        missing.push(`agent:${agentName}`);
       }
     }
     console.log(`  → ${count} agent(s) installed to ${destAgents}`);
@@ -422,9 +425,12 @@ function installOnly(targetDir, onlySkills, onlyAgents) {
     const workspaces = findWorkspaces(targetDir);
     for (const ws of workspaces) {
       console.log(`\n  Workspace: ${ws.name}`);
-      installOnly(ws.path, onlySkills, onlyAgents);
+      const wsMissing = installOnly(ws.path, onlySkills, onlyAgents);
+      missing.push(...wsMissing);
     }
   }
+
+  return missing;
 }
 
 function parseArgv() {
@@ -433,15 +439,33 @@ function parseArgv() {
   const positional = [];
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--only' && args[i + 1]) {
+    if (args[i] === '--only') {
+      const next = args[i + 1];
+      if (!next || next.startsWith('--')) {
+        console.error('  ✗ --only requires a comma-separated list of skills');
+        process.exit(1);
+      }
       flags.only = args[++i].split(',').map(s => s.trim()).filter(Boolean);
-    } else if (args[i] === '--agents' && args[i + 1]) {
+    } else if (args[i] === '--agents') {
+      const next = args[i + 1];
+      if (!next || next.startsWith('--')) {
+        console.error('  ✗ --agents requires a comma-separated list of agents');
+        process.exit(1);
+      }
       flags.agents = args[++i].split(',').map(s => s.trim()).filter(Boolean);
     } else if (args[i] === '--install-ccstatusline') {
       flags.installCcstatusline = true;
-    } else if (!args[i].startsWith('--')) {
+    } else if (args[i].startsWith('--')) {
+      console.error(`  ✗ Unknown flag: ${args[i]}`);
+      process.exit(1);
+    } else {
       positional.push(args[i]);
     }
+  }
+
+  if (flags.agents && !flags.only) {
+    console.error('  ✗ --agents can only be used with --only');
+    process.exit(1);
   }
 
   return { flags, positional };
@@ -466,7 +490,12 @@ function main() {
   // Handle --only mode: install specific skills/agents without touching hooks/settings
   if (flags.only) {
     console.log(`\nInstalling specific items to: ${targetDir}\n`);
-    installOnly(targetDir, flags.only, flags.agents || []);
+    const missing = installOnly(targetDir, flags.only, flags.agents || []);
+    if (missing.length > 0) {
+      const unique = [...new Set(missing)];
+      console.error(`\n  ✗ Missing items: ${unique.join(', ')}`);
+      process.exit(1);
+    }
     console.log('\nDone!\n');
     return;
   }

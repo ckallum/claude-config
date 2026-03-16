@@ -46,7 +46,8 @@ Read `.claude/skills/review/checklist.md`.
 
 Only run this step if:
 - `$ARGUMENTS` contains "greptile", OR
-- A file exists at `$HOME/.claude/review/projects/*/greptile-history.md` for this repo (auto-detect returning user)
+- A file exists at `$HOME/.claude/review/projects/$REMOTE_SLUG/greptile-history.md` for this repo
+  (derive `REMOTE_SLUG` from `gh repo view --json nameWithOwner --jq '.nameWithOwner' | tr '/' '__'`)
 
 Read `.claude/skills/review/greptile-triage.md` and follow the fetch, filter, classify, and escalation detection steps.
 

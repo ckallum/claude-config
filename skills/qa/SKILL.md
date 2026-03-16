@@ -79,8 +79,8 @@ This is the **primary mode** for developers verifying their work.
 
 1. **Analyze the branch diff** to understand what changed:
    ```bash
-   git diff main...HEAD --name-only
-   git log main..HEAD --oneline
+   git diff origin/main...HEAD --name-only
+   git log origin/main..HEAD --oneline
    ```
 
 2. **Identify affected pages/routes** from the changed files:
@@ -252,6 +252,7 @@ Each category starts at 100. Deduct per finding:
 Minimum 0 per category.
 
 ### Weights
+
 | Category | Weight |
 |----------|--------|
 | Console | 15% |

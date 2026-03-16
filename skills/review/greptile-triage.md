@@ -34,7 +34,10 @@ The `position != null` filter on line-level comments automatically skips outdate
 
 Derive the project-specific history path:
 ```bash
-REMOTE_SLUG=$(basename "$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")")
+REMOTE_SLUG=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null | tr '/' '__')
+if [ -z "$REMOTE_SLUG" ]; then
+  REMOTE_SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+fi
 PROJECT_HISTORY="$HOME/.claude/review/projects/$REMOTE_SLUG/greptile-history.md"
 ```
 
@@ -183,7 +186,10 @@ When classifying comments, also assess whether Greptile's implied severity match
 
 Before writing, ensure directories exist:
 ```bash
-REMOTE_SLUG=$(basename "$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")")
+REMOTE_SLUG=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null | tr '/' '__')
+if [ -z "$REMOTE_SLUG" ]; then
+  REMOTE_SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+fi
 mkdir -p "$HOME/.claude/review/projects/$REMOTE_SLUG"
 mkdir -p "$HOME/.claude/review"
 ```

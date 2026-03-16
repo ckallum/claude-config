@@ -6,7 +6,7 @@
 |----------|------------|----------|
 | **critical** | Blocks a core workflow, causes data loss, or crashes the app | Form submit causes error page, checkout flow broken, data deleted without confirmation |
 | **high** | Major feature broken or unusable, no workaround | Search returns wrong results, file upload silently fails, auth redirect loop |
-| **medium** | Feature works but with noticeable problems, workaround exists | Slow page load (>5s), form validation missing but submit still works, layout broken on mobile only |
+| **medium** | Feature works but with noticeable problems, workaround exists | Slow page load (>3s), form validation missing but submit still works, layout broken on mobile only |
 | **low** | Minor cosmetic or polish issue | Typo in footer, 1px alignment issue, hover state inconsistent |
 
 ## Categories

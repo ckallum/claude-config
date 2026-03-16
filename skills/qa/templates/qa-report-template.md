@@ -23,6 +23,7 @@
 | Visual | {0-100} |
 | Functional | {0-100} |
 | UX | {0-100} |
+| Content | {0-100} |
 | Performance | {0-100} |
 | Accessibility | {0-100} |
 
