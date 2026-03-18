@@ -34,7 +34,7 @@ If no skill name is provided, use AskUserQuestion:
 
 **Target directory resolution:**
 1. If the current working directory contains `.claude/skills/`, create the skill there (project-local skill).
-2. If the current working directory is inside `/Users/callumke/Projects/claude`, create in `skills/` (global skill).
+2. If the current working directory contains `config/profiles.json` (i.e., it's the claude config repo), create in `skills/` (global skill).
 3. Otherwise, use AskUserQuestion to ask whether this should be a project-local or global skill, then create accordingly.
 
 ## Step 1: Category Selection
@@ -111,12 +111,12 @@ Read `skills/skill-builder/templates/skill-template.md` as the starting skeleton
 
 After creating all files:
 
-1. Read `config/profiles.json` from the claude config repo (`/Users/callumke/Projects/claude/config/profiles.json`).
+1. Read `config/profiles.json` from the claude config repo (find it by walking up from cwd looking for `config/profiles.json`).
 2. Add the new skill name to the `base.skills` array.
 3. Add the new skill name to the `monorepo-root.skills` array (since monorepo-root declares its own `skills` array, it does not inherit from base).
 4. Write the updated `profiles.json`.
 
-**Only register if the skill was created in the global skills directory** (`/Users/callumke/Projects/claude/skills/`). Project-local skills should not be registered in the global profiles.
+**Only register if the skill was created in the global skills directory** (the `skills/` folder next to `config/profiles.json`). Project-local skills should not be registered in the global profiles.
 
 ## Step 6: Confirm
 
