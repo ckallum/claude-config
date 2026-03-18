@@ -2,8 +2,10 @@
 name: review
 version: 1.0.0
 description: |
-  Pre-landing PR review. Two-pass analysis (critical blocking + informational),
-  parallel @code-reviewer dispatch, optional Greptile comment triage, TODO cross-reference.
+  review this, pre-landing review, check my code, review before merge, code review,
+  look over my changes, audit this PR.
+  Two-pass analysis (critical blocking + informational), parallel @code-reviewer
+  dispatch, optional Greptile comment triage, TODO cross-reference.
 argument-hint: [greptile]
 allowed-tools:
   - Bash
@@ -181,9 +183,8 @@ node -e "
   const { execSync } = require('child_process');
   const fs = require('fs');
   const path = require('path');
-  const diff = execSync('git diff origin/main', { encoding: 'utf8' });
-  const unstaged = execSync('git diff', { encoding: 'utf8' });
-  const hash = crypto.createHash('sha256').update(diff + unstaged).digest('hex');
+  const diff = execSync('git diff --cached', { encoding: 'utf8' });
+  const hash = crypto.createHash('sha256').update(diff).digest('hex');
   const reviewDir = path.join(process.cwd(), '.claude');
   if (!fs.existsSync(reviewDir)) fs.mkdirSync(reviewDir, { recursive: true });
   fs.writeFileSync(path.join(reviewDir, '.last-review'), JSON.stringify({
@@ -218,3 +219,10 @@ Review complete: BLOCKED | N critical issues need resolution
 - **Be terse.** One line problem, one line fix. No preamble.
 - **Only flag real problems.** Skip anything that's fine. Respect the suppressions list.
 - **One issue per AskUserQuestion.** Never batch multiple issues into one question.
+
+## Gotchas
+
+- **REMOTE_SLUG uses `tr '/' '__'`** to preserve the owner in the path (e.g., `owner__repo`). Don't use just the repo name.
+- **Greptile auto-detect is repo-scoped, not wildcard.** The history file path includes the full `REMOTE_SLUG`, so it only activates for repos that have been triaged before.
+- **The review stamp hashes `git diff --cached`** (staged changes only). If you stage/unstage files after the stamp, the review gate will see a mismatch. Stage everything before running `/review`.
+- **If the checklist file is missing**, the skill stops early. Run `/configure-claude` to install it.
