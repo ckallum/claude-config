@@ -3,10 +3,11 @@ name: review
 version: 1.0.0
 description: |
   review this, pre-landing review, check my code, review before merge, code review,
-  look over my changes, audit this PR.
-  Two-pass analysis (critical blocking + informational), parallel @code-reviewer
-  dispatch, optional Greptile comment triage, TODO cross-reference.
-argument-hint: [greptile]
+  look over my changes, audit this PR, review PR, review pull request.
+  Five-agent parallel review: conventions, security checklist, git blame history,
+  previous PR comments, code comment compliance. Confidence scoring, Greptile triage,
+  TODO cross-reference, flow diagrams.
+argument-hint: [greptile | pr <number>]
 allowed-tools:
   - Bash
   - Read
@@ -22,13 +23,21 @@ You are running the `/review` workflow. Analyze the current branch's diff agains
 
 ## Arguments
 
-- `/review` — full review (default)
+- `/review` — full review of current branch vs main (default)
 - `/review greptile` — include Greptile bot comment triage
+- `/review pr <number>` — review an existing PR by number (fetches diff from GitHub)
 
 ---
 
 ## Step 1: Pre-flight
 
+**If `$ARGUMENTS` contains `pr <number>`:** PR review mode.
+1. Run `gh pr view <number> --json state,isDraft` to check eligibility.
+2. If the PR is closed, a draft, or trivially small (automated/bot PR), output: **"PR not eligible for review."** and stop.
+3. Run `gh pr diff <number>` to get the diff. Use this instead of `git diff origin/main` for all subsequent steps.
+4. Skip to Step 2.
+
+**Otherwise:** Local branch review mode.
 1. Run `git branch --show-current` to get the current branch.
 2. If on `main`, output: **"Nothing to review — you're on main."** and stop.
 3. Run `git fetch origin main --quiet && git diff origin/main --stat` to check if there's a diff.
@@ -61,7 +70,7 @@ Read `.claude/skills/review/greptile-triage.md` and follow the fetch, filter, cl
 
 ## Step 3: Dispatch Parallel Review Agents
 
-Dispatch **2 parallel agents** in a single message using the Agent tool:
+Dispatch **5 parallel agents** in a single message using the Agent tool:
 
 **Agent A — Convention review (@code-reviewer):**
 ```text
@@ -100,16 +109,76 @@ Categorize each as CRITICAL or INFORMATIONAL."
 description: "Checklist review (security + structural)"
 ```
 
-Wait for both agents to return.
+**Agent C — Git blame & history review:**
+```text
+prompt: "Review the changes between origin/main and HEAD using git history context.
+
+1. Run `git diff origin/main --name-only` to get changed files.
+2. For each changed file, run `git log --oneline -10 -- <file>` and
+   `git blame -L <changed-lines> -- <file>` to understand the history.
+3. Look for:
+   - Code that was recently refactored and is being changed again (churn = risk)
+   - Patterns that were deliberately established by previous commits
+   - Bug fixes being undone or weakened by the current changes
+   - TODO/FIXME/HACK comments in blamed lines that are relevant
+
+Return a list of findings with file:line references. For each, include the
+relevant git history context (commit hash + message) that makes it a concern.
+Only flag issues where history provides insight — skip if history is clean."
+description: "Git blame & history review"
+```
+
+**Agent D — Previous PR comment review:**
+```text
+prompt: "Check if previous PRs that touched these files had review comments
+that may also apply to the current changes.
+
+1. Run `git diff origin/main --name-only` to get changed files.
+2. For each file (max 5), run:
+   `gh pr list --state merged --search <filename> --limit 3 --json number`
+3. For each found PR, fetch review comments:
+   `gh api repos/{owner}/{repo}/pulls/<number>/comments --jq '.[] | select(.path == \"<file>\") | {body: .body, line: .line}'`
+4. Check if any previous review comments apply to the current changes
+   (same patterns, same concerns, same files).
+
+Return findings only if previous comments are genuinely relevant to the
+current diff. Skip stale or inapplicable comments."
+description: "Previous PR comment review"
+```
+
+**Agent E — Code comment compliance:**
+```text
+prompt: "Check that the changes between origin/main and HEAD comply with
+code comments in the modified files.
+
+1. Run `git diff origin/main --name-only` to get changed files.
+2. For each changed file, read the full file and identify:
+   - TODO/FIXME/HACK comments near changed lines
+   - Docstrings or inline comments that describe expected behavior
+   - Warning comments (e.g., 'DO NOT MODIFY', 'must be called before X')
+3. Verify the changes don't violate any of these documented constraints.
+
+Return findings with file:line references. Only flag genuine violations —
+not stale comments about unrelated code."
+description: "Code comment compliance"
+```
+
+Wait for all 5 agents to return.
 
 ---
 
-## Step 4: Merge and Deduplicate Findings
+## Step 4: Merge, Score, and Filter Findings
 
-1. Collect findings from both agents.
-2. Deduplicate: if both agents flag the same file:line for the same issue, keep the one with more detail.
-3. Merge into a single findings list, preserving CRITICAL vs INFORMATIONAL classification.
-4. If Greptile triage ran in Step 2.5, append VALID & ACTIONABLE Greptile findings as CRITICAL items.
+1. Collect findings from all 5 agents.
+2. Deduplicate: if multiple agents flag the same file:line for the same issue, keep the one with most detail.
+3. **Confidence score each finding** on a 0-100 scale:
+   - **0-25:** Likely false positive — doesn't stand up to scrutiny, or is a pre-existing issue.
+   - **25-50:** Might be real but unverifiable, or is a stylistic preference not backed by CLAUDE.md.
+   - **50-75:** Real issue but minor — nitpick, rarely hit in practice, or low impact.
+   - **75-100:** Verified real issue — will impact functionality, directly violates CLAUDE.md, or has historical evidence (git blame/previous PR comments support it).
+4. **Filter out findings scoring below 60.** This eliminates noise and false positives.
+5. Classify remaining findings: score ≥ 80 = CRITICAL, score 60-79 = INFORMATIONAL.
+6. If Greptile triage ran in Step 2.5, append VALID & ACTIONABLE Greptile findings as CRITICAL items.
 
 ---
 
@@ -121,13 +190,13 @@ Output all findings:
 ## Pre-Landing Review: N issues (X critical, Y informational)
 [+ M Greptile comments (A valid, B fixed, C FP)]  ← only if Greptile ran
 
-### CRITICAL (blocking)
-1. [file:line] Problem description
+### CRITICAL (blocking) — confidence ≥ 80
+1. [file:line] Problem description (score: 85)
    Fix: suggested fix
-   Source: checklist | @code-reviewer | greptile
+   Source: convention | checklist | blame | prev-PR | comments | greptile
 
-### INFORMATIONAL (advisory)
-1. [file:line] Problem description
+### INFORMATIONAL (advisory) — confidence 60-79
+1. [file:line] Problem description (score: 65)
    Fix: suggested fix
 ```
 
@@ -261,3 +330,6 @@ Review complete: BLOCKED | N critical issues need resolution
 - **The review stamp hashes `git diff --cached`** (staged changes only). If you stage/unstage files after the stamp, the review gate will see a mismatch. Stage everything before running `/review`.
 - **If the checklist file is missing**, the skill stops early. Run `/configure-claude` to install it.
 - **Flow diagram is posted as a PR comment**, not in the review output. If no PR exists yet, include it inline instead. Skip for trivial diffs (< 50 lines, config-only, docs-only).
+- **Confidence scoring filters noise.** Findings below 60 are dropped entirely. Don't lower the threshold to include more — the cutoff exists to prevent false positive fatigue.
+- **Git blame agent may be slow on large files.** It runs `git blame` per changed file — on files with thousands of lines, this takes time. The 5 agents run in parallel so it doesn't block the others.
+- **PR mode (`/review pr <number>`)** fetches the diff from GitHub, not the local branch. The review stamp is NOT written in PR mode (there's no local staged diff to hash).
