@@ -248,9 +248,12 @@ function installForProfile(targetDir, resolvedProfile, label) {
   }
 
   // 3. Copy skills (only those in resolved profile)
+  // Skills that only make sense in the config repo itself — never export to target repos
+  const INTERNAL_SKILLS = new Set(['configure-claude', 'skill-builder']);
   const destSkills = path.join(claudeDir, 'skills');
   let skillCount = 0;
   for (const skillName of resolvedProfile.skills) {
+    if (INTERNAL_SKILLS.has(skillName)) continue;
     const srcSkill = path.join(SKILLS_DIR, skillName);
     if (fs.existsSync(srcSkill) && fs.statSync(srcSkill).isDirectory()) {
       copyDirSync(srcSkill, path.join(destSkills, skillName));
@@ -383,10 +386,15 @@ function installOnly(targetDir, onlySkills, onlyAgents) {
   const missing = [];
 
   // Install specified skills
+  const INTERNAL_ONLY = new Set(['configure-claude', 'skill-builder']);
   if (onlySkills.length > 0) {
     const destSkills = path.join(claudeDir, 'skills');
     let count = 0;
     for (const skillName of onlySkills) {
+      if (INTERNAL_ONLY.has(skillName)) {
+        console.log(`  ⊘ Skipped internal skill: ${skillName}`);
+        continue;
+      }
       const srcSkill = path.join(SKILLS_DIR, skillName);
       if (fs.existsSync(srcSkill) && fs.statSync(srcSkill).isDirectory()) {
         copyDirSync(srcSkill, path.join(destSkills, skillName));
