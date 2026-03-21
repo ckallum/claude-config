@@ -14,7 +14,7 @@ const {
   getSessionsDir,
   readFile,
   log
-} = require('./utils');
+} = require('./utils.cjs');
 
 // Session filename pattern: YYYY-MM-DD-[short-id]-session.tmp
 // The short-id is optional (old format) and can be 8+ alphanumeric characters

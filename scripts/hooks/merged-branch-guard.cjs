@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
-const { readStdinJson, log, getSessionIdShort } = require('../lib/utils');
+const { readStdinJson, log, getSessionIdShort } = require('../lib/utils.cjs');
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 

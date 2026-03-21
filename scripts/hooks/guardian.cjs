@@ -7,7 +7,7 @@
  */
 
 const path = require('path');
-const { readStdinJson, log, getClaudeDir, getSessionIdShort, ensureDir, appendFile, readFile, getDateString } = require('../lib/utils');
+const { readStdinJson, log, getClaudeDir, getSessionIdShort, ensureDir, appendFile, readFile, getDateString } = require('../lib/utils.cjs');
 
 function loadRules() {
   // Check project-local config first, then fall back to co-located config/

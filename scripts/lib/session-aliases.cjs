@@ -12,7 +12,7 @@ const {
   readFile,
   writeFile,
   log
-} = require('./utils');
+} = require('./utils.cjs');
 
 // Aliases file path
 function getAliasesPath() {
