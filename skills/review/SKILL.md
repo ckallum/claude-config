@@ -165,12 +165,15 @@ description: "Code comment compliance"
 
 **Agent F — Silent failure hunter (conditional):**
 
-Only dispatch if the diff contains error handling code (try/catch, .catch, error callbacks, Result types, fallback logic).
+Only dispatch if the diff contains error-handling code (try/catch, .catch, error callbacks, Result types, fallback logic).
 
 ```text
-prompt: "Hunt for silent failures in the changes between origin/main and HEAD.
+prompt: "Hunt for silent failures in the target diff for this review.
 
-Run `git diff origin/main` to get the full diff. For every error handling
+Use the same diff source selected in Step 1:
+- local mode: `git diff origin/main`
+- PR mode: the `gh pr diff <number>` output already fetched
+For every error-handling
 location in the changed code, scrutinize:
 
 1. **Catch block specificity:** Does it catch only expected errors, or could
@@ -198,12 +201,15 @@ description: "Silent failure hunter"
 
 **Agent G — Type design review (conditional):**
 
-Only dispatch if the diff introduces new types, interfaces, or enums (TypeScript/Python/Go/Rust).
+Only dispatch if the diff introduces or significantly modifies type definitions (types, interfaces, enums, classes, structs in TypeScript/Python/Go/Rust).
 
 ```text
-prompt: "Review type design in the changes between origin/main and HEAD.
+prompt: "Review type design in the target diff for this review.
 
-Run `git diff origin/main` to find new or modified type definitions
+Use the same diff source selected in Step 1:
+- local mode: `git diff origin/main`
+- PR mode: the `gh pr diff <number>` output already fetched
+Find new or modified type definitions
 (interfaces, types, enums, classes, structs).
 
 For each new or significantly modified type, evaluate:
