@@ -28,6 +28,7 @@ const SCRIPTS_LIB = path.join(CONFIG_REPO, 'scripts', 'lib');
 const SKILLS_DIR = path.join(CONFIG_REPO, 'skills');
 const AGENTS_DIR = path.join(CONFIG_REPO, 'agents');
 const TEMPLATES_DIR = path.join(CONFIG_REPO, 'templates');
+const LINT_CONFIGS_DIR = path.join(CONFIG_REPO, 'config', 'lint-configs');
 const HOME_DIR = require('os').homedir();
 const HOME_SETTINGS = path.join(HOME_DIR, '.claude', 'settings.json');
 const HOME_SETTINGS_LOCAL = path.join(HOME_DIR, '.claude', 'settings.local.json');
@@ -245,6 +246,38 @@ function installForProfile(targetDir, resolvedProfile, label) {
     fs.mkdirSync(path.join(claudeDir, 'config'), { recursive: true });
     fs.copyFileSync(guardianSrc, guardianDest);
     console.log(`  ✓ Copied guardian rules → ${guardianDest}`);
+  }
+
+  // 2c. Copy agent lint rules config
+  const agentRulesSrc = path.join(LINT_CONFIGS_DIR, 'agent-rules.json');
+  const agentRulesDest = path.join(claudeDir, 'config', 'agent-rules.json');
+  if (fs.existsSync(agentRulesSrc)) {
+    fs.mkdirSync(path.join(claudeDir, 'config'), { recursive: true });
+    fs.copyFileSync(agentRulesSrc, agentRulesDest);
+    console.log(`  ✓ Copied agent lint rules → ${agentRulesDest}`);
+  }
+
+  // 2d. Copy ESLint base configs (no-overwrite — respect existing project configs)
+  const lintConfigDest = path.join(targetDir, '.eslintrc.json');
+  if (!fs.existsSync(lintConfigDest) && !fs.existsSync(path.join(targetDir, 'eslint.config.js')) && !fs.existsSync(path.join(targetDir, 'eslint.config.mjs'))) {
+    // Determine which config to install based on detected profiles
+    const isTypescript = fs.existsSync(path.join(targetDir, 'tsconfig.json'));
+    const configSrc = isTypescript
+      ? path.join(LINT_CONFIGS_DIR, 'typescript.eslintrc.json')
+      : path.join(LINT_CONFIGS_DIR, 'base.eslintrc.json');
+    if (fs.existsSync(configSrc)) {
+      // For typescript config, also copy the base config it extends
+      if (isTypescript) {
+        const baseDest = path.join(targetDir, '.eslintrc.base.json');
+        if (!fs.existsSync(baseDest)) {
+          fs.copyFileSync(path.join(LINT_CONFIGS_DIR, 'base.eslintrc.json'), baseDest);
+        }
+      }
+      fs.copyFileSync(configSrc, lintConfigDest);
+      console.log(`  ✓ Installed ESLint config → ${lintConfigDest} (${isTypescript ? 'typescript' : 'base'})`);
+    }
+  } else {
+    console.log(`  ✓ ESLint config already exists (skipped)`);
   }
 
   // 3. Copy skills (only those in resolved profile)

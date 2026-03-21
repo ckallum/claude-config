@@ -215,6 +215,31 @@
         "match": { "file_path": "\\.(md|txt)$" },
         "except": { "file_path": "(README|CLAUDE|AGENTS|CONTRIBUTING|SPECLOG|CHANGELOG)\\.md$|\\.claude/" },
         "reason": "Unnecessary documentation file — use README.md or .claude/ instead"
+      },
+      {
+        "id": "deny-cross-layer-import-fe-to-be",
+        "tool": "Edit",
+        "match": { "file_path": "frontend/", "new_string": "from\\s+['\"].*backend/" },
+        "reason": "Cross-layer import: frontend must not import from backend — use shared/ or an API boundary"
+      },
+      {
+        "id": "deny-cross-layer-write-fe-to-be",
+        "tool": "Write",
+        "match": { "file_path": "frontend/", "content": "from\\s+['\"].*backend/" },
+        "reason": "Cross-layer import: frontend must not import from backend — use shared/ or an API boundary"
+      },
+      {
+        "id": "deny-test-in-src",
+        "tool": "Write",
+        "match": { "file_path": "src/.*\\.(test|spec)\\.(ts|tsx|js|jsx)$" },
+        "except": { "file_path": "__tests__/" },
+        "reason": "Tests should be colocated next to their source files, not nested inside src/ without a module — check file placement"
+      },
+      {
+        "id": "deny-write-env-example-secrets",
+        "tool": "Write",
+        "match": { "file_path": "\\.env\\.example$", "content": "(sk-|ghp_|AKIA|password\\s*=\\s*[^$])" },
+        "reason": "Possible secret in .env.example — use placeholder values only"
       }
     ],
     "warn": [
@@ -247,6 +272,25 @@
         "tool": "Write",
         "match": { "file_path": "(\\.github/|\\.gitlab-ci|Jenkinsfile)" },
         "reason": "Pipeline changes"
+      },
+      {
+        "id": "warn-new-file-no-test",
+        "tool": "Write",
+        "match": { "file_path": "\\.(ts|tsx|js|jsx)$" },
+        "except": { "file_path": "(\\.(test|spec|config|d)\\.|__tests__|node_modules|\\.(eslintrc|prettierrc))" },
+        "reason": "New source file — ensure a colocated .test.{ext} file exists for test coverage"
+      },
+      {
+        "id": "warn-deep-nesting",
+        "tool": "Write",
+        "match": { "file_path": "(/[^/]+){7,}\\.(ts|tsx|js|jsx)$" },
+        "reason": "Deeply nested file (7+ levels) — consider flattening the directory structure for discoverability"
+      },
+      {
+        "id": "warn-edit-lint-config",
+        "tool": "Edit",
+        "match": { "file_path": "(\\.eslintrc|eslint\\.config|agent-rules\\.json|guardian-rules\\.json)" },
+        "reason": "Modifying lint/guardian config — ensure rule changes are intentional and documented"
       }
     ]
   }
