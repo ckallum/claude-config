@@ -65,12 +65,13 @@ For **agent-rules** (most common), generate a JSON entry:
 ```json
 {
   "id": "descriptive-kebab-id",
-  "pattern": "regex pattern",
+  "pattern": "regex pattern (use null if using check instead)",
   "files": "glob pattern for target files",
   "exclude": ["globs to skip"],
   "severity": "error|warn|info",
   "message": "Human-readable explanation with fix suggestion",
-  "autofix": null
+  "autofix": null,
+  "check": "optional: colocated-test (mutually exclusive with pattern)"
 }
 ```
 
@@ -110,8 +111,11 @@ For **ESLint rules**, suggest the appropriate built-in or plugin rule with confi
 Run the lint-gate or eslint check to confirm the new rule catches the intended pattern:
 
 ```bash
-# For agent rules — simulate a commit check
-node .claude/scripts/hooks/lint-gate.js < /dev/null
+# For agent rules — test the pattern against the codebase
+grep -rn "PATTERN" --include="*.ts" --include="*.js" src/
+
+# Then stage files and do a test commit to trigger lint-gate:
+# git add . && git commit -m "test [skip-review]"
 
 # For ESLint — run on target files
 npx eslint --rule '{"rule-name": "error"}' src/

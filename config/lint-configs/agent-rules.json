@@ -12,7 +12,7 @@
     },
     {
       "id": "no-relative-parent-import",
-      "pattern": "from\\s+['\"]\\.\\./(\\.\\./)+(\\.\\.)?",
+      "pattern": "from\\s+['\"]\\.\\./(\\.\\./)\\.\\./(\\.\\.)?",
       "files": "**/*.{ts,tsx,js,jsx}",
       "exclude": ["**/*.test.*", "**/*.spec.*"],
       "severity": "warn",

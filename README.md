@@ -60,6 +60,7 @@ Servers are written to `~/.mcp.json` and enabled in `~/.claude/settings.local.js
 
 ## Changelog
 
+- **2.1** — Lint-directed agents: ESLint config auto-install, `agent-rules.json` structural lint rules, `lint-gate.js` pre-commit hook, `eslint-check.js` post-edit hook, `/lint-rule-gen` skill, Guardian architectural boundary rules
 - **1.9** — Pre-commit review gate: `review-gate.js` hook + `@code-reviewer` agent for convention-aware code reviews before commits
 - **1.8** — Guardian autonomous approval system: smart PreToolUse hook with configurable deny/warn rules, audit logging, and mode-based permissions
 - **1.7** — Context7 MCP server and `/context7` skill for current library documentation lookup

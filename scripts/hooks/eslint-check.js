@@ -33,8 +33,11 @@ process.stdin.on('end', () => {
           fs.existsSync(path.join(dir, '.eslintrc.json')) ||
           fs.existsSync(path.join(dir, '.eslintrc.js')) ||
           fs.existsSync(path.join(dir, '.eslintrc.cjs')) ||
+          fs.existsSync(path.join(dir, '.eslintrc.yaml')) ||
+          fs.existsSync(path.join(dir, '.eslintrc.yml')) ||
           fs.existsSync(path.join(dir, 'eslint.config.js')) ||
-          fs.existsSync(path.join(dir, 'eslint.config.mjs'))
+          fs.existsSync(path.join(dir, 'eslint.config.mjs')) ||
+          fs.existsSync(path.join(dir, 'eslint.config.cjs'))
         ) {
           hasConfig = true;
           break;

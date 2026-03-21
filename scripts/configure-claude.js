@@ -259,7 +259,13 @@ function installForProfile(targetDir, resolvedProfile, label) {
 
   // 2d. Copy ESLint base configs (no-overwrite — respect existing project configs)
   const lintConfigDest = path.join(targetDir, '.eslintrc.json');
-  if (!fs.existsSync(lintConfigDest) && !fs.existsSync(path.join(targetDir, 'eslint.config.js')) && !fs.existsSync(path.join(targetDir, 'eslint.config.mjs'))) {
+  const hasExistingEslintConfig =
+    fs.existsSync(lintConfigDest) ||
+    fs.existsSync(path.join(targetDir, '.eslintrc.js')) ||
+    fs.existsSync(path.join(targetDir, '.eslintrc.cjs')) ||
+    fs.existsSync(path.join(targetDir, 'eslint.config.js')) ||
+    fs.existsSync(path.join(targetDir, 'eslint.config.mjs'));
+  if (!hasExistingEslintConfig) {
     // Determine which config to install based on detected profiles
     const isTypescript = fs.existsSync(path.join(targetDir, 'tsconfig.json'));
     const configSrc = isTypescript

@@ -2,6 +2,9 @@
   "_description": "TypeScript ESLint config. Extends base with TS-specific agent-directed rules.",
   "extends": ["./.eslintrc.base.json"],
   "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": true
+  },
   "plugins": ["@typescript-eslint"],
   "rules": {
     "no-unused-vars": "off",
