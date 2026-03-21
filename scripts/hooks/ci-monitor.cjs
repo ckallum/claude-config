@@ -8,7 +8,7 @@
 
 const path = require('path');
 const { spawn } = require('child_process');
-const { readStdinJson, log } = require('../lib/utils');
+const { readStdinJson, log } = require('../lib/utils.cjs');
 
 async function main() {
   const input = await readStdinJson();
@@ -34,7 +34,7 @@ async function main() {
   log(`[Babysit PR] Status: /tmp/claude-babysit-${prNumber}.json`);
 
   // Spawn detached daemon
-  const daemonScript = path.join(__dirname, 'babysit-pr-daemon.js');
+  const daemonScript = path.join(__dirname, 'babysit-pr-daemon.cjs');
   const child = spawn('node', [daemonScript, ownerRepo, prNumber], {
     detached: true,
     stdio: 'ignore',

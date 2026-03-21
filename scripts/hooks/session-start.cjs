@@ -16,9 +16,9 @@ const {
   readFile,
   ensureDir,
   log
-} = require('../lib/utils');
-const { getPackageManager, getSelectionPrompt } = require('../lib/package-manager');
-const { listAliases } = require('../lib/session-aliases');
+} = require('../lib/utils.cjs');
+const { getPackageManager, getSelectionPrompt } = require('../lib/package-manager.cjs');
+const { listAliases } = require('../lib/session-aliases.cjs');
 
 async function main() {
   const sessionsDir = getSessionsDir();
