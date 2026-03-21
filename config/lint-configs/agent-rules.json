@@ -1,0 +1,59 @@
+{
+  "_description": "Agent-directed structural lint rules. Checked by lint-gate.js hook. These encode conventions that ESLint AST rules cannot express — file placement, import patterns, naming.",
+  "rules": [
+    {
+      "id": "no-default-export",
+      "pattern": "^export\\s+default\\b",
+      "files": "**/*.{ts,tsx,js,jsx}",
+      "exclude": ["**/pages/**", "**/app/**", "next.config.*", "vite.config.*", "*.config.*"],
+      "severity": "warn",
+      "message": "Prefer named exports over default exports for grep-ability",
+      "autofix": null
+    },
+    {
+      "id": "no-relative-parent-import",
+      "pattern": "from\\s+['\"]\\.\\./(\\.\\./)\\.\\./(\\.\\.)?",
+      "files": "**/*.{ts,tsx,js,jsx}",
+      "exclude": ["**/*.test.*", "**/*.spec.*"],
+      "severity": "warn",
+      "message": "Deep relative imports (3+ levels) are fragile — use path aliases instead",
+      "autofix": null
+    },
+    {
+      "id": "no-string-replace-dollar",
+      "pattern": "\\.replace\\([^,]+,\\s*['\"][^'\"]*\\$[0-9&`'][^'\"]*['\"]\\s*\\)",
+      "files": "**/*.{ts,tsx,js,jsx}",
+      "exclude": [],
+      "severity": "error",
+      "message": "String.replace with $ in replacement interprets special sequences — use a function replacer: .replace(pattern, () => value)",
+      "autofix": null
+    },
+    {
+      "id": "no-stringify-unguarded",
+      "pattern": "JSON\\.stringify\\([a-zA-Z_$][a-zA-Z0-9_$]*\\)",
+      "files": "**/*.{ts,tsx,js,jsx}",
+      "exclude": ["**/*.test.*", "**/*.spec.*"],
+      "severity": "warn",
+      "message": "JSON.stringify(undefined) returns undefined (not a string) — guard the input or use a fallback",
+      "autofix": null
+    },
+    {
+      "id": "test-colocation",
+      "pattern": null,
+      "files": "**/*.{ts,tsx,js,jsx}",
+      "exclude": ["**/*.test.*", "**/*.spec.*", "**/*.d.ts", "**/types.*", "**/index.*", "**/*.config.*"],
+      "severity": "info",
+      "message": "Logic file without colocated test — consider adding {basename}.test.{ext}",
+      "check": "colocated-test"
+    },
+    {
+      "id": "no-barrel-import-internal",
+      "pattern": "from\\s+['\"]\\.\\.?/[^'\"]+/index['\"]",
+      "files": "**/*.{ts,tsx,js,jsx}",
+      "exclude": [],
+      "severity": "info",
+      "message": "Importing from barrel index file — prefer direct module imports for tree-shaking and clarity",
+      "autofix": null
+    }
+  ]
+}

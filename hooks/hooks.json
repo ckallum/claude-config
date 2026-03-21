@@ -43,6 +43,16 @@
         "description": "Review gate: require code review before commits"
       },
       {
+        "matcher": "tool == \"Bash\" && tool_input.command matches \"git commit(\\\\s|$)\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_CONFIG_DIR}/scripts/hooks/lint-gate.js\""
+          }
+        ],
+        "description": "Lint gate: check structural lint rules before commits"
+      },
+      {
         "matcher": "tool == \"Bash\" && tool_input.command matches \"(npm (install|test)|pnpm (install|test)|yarn (install|test)?|bun (install|test)|cargo build|make|docker|pytest|vitest|playwright)\"",
         "hooks": [
           {
@@ -149,6 +159,16 @@
           }
         ],
         "description": "Warn about console.log statements after edits"
+      },
+      {
+        "matcher": "(tool == \"Edit\" || tool == \"Write\") && tool_input.file_path matches \"\\\\.(ts|tsx|js|jsx)$\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_CONFIG_DIR}/scripts/hooks/eslint-check.js\""
+          }
+        ],
+        "description": "ESLint check: report violations after JS/TS edits for agent self-correction"
       }
     ],
     "Stop": [
