@@ -27,9 +27,10 @@ Flexible execution skill with three modes. All modes share the same execution en
 ## Step 0: Mode Selection
 
 Parse `$ARGUMENTS`:
-- Starts with `spec` → **SPEC** mode (extract slug from remaining args)
-- Starts with `issue` → **ISSUE** mode (extract number from remaining args)
-- Empty or anything else → **RAW** mode
+- Empty → **RAW** mode
+- Starts with `spec` → **SPEC** mode (extract slug from remaining args, e.g., `/execute spec auth-flow` → slug = `auth-flow`)
+- Starts with `issue` → **ISSUE** mode (extract number from remaining args, e.g., `/execute issue 42` → number = `42`)
+- Any other non-empty value → **STOP** and tell the user: "Unknown mode. Use `/execute`, `/execute spec <slug>`, or `/execute issue <number>`."
 
 ---
 
@@ -56,7 +57,7 @@ Store the confirmed summary as `COMPLIANCE_REFERENCE`.
 
 ### SPEC Mode
 
-1. Find the spec by slug from `$ARGUMENTS` or most recent in `.claude/specs/`. Read all spec files:
+1. Find the spec using the slug parsed in Step 0 (e.g., `auth-flow` → `.claude/specs/auth-flow/`). If no slug was provided after `spec`, use the most recent spec in `.claude/specs/`. Read all spec files:
    - `requirements.md`
    - `design.md`
    - `tasks.md`
@@ -104,7 +105,7 @@ gh issue view <number> --json title,body,labels,comments,assignees
 
 ## Step 3: Execution Loop (shared)
 
-Work through tasks in batches of 3. For each task:
+Execute tasks sequentially, reporting progress in batches of 3. For each task:
 
 ### 3a: Dispatch implementer agent
 
@@ -211,7 +212,7 @@ After all tasks are done:
 
 1. Run the full test suite.
 2. Mode-specific updates:
-   - **SPEC:** Update `tasks.md` with all checkboxes checked. Update CHANGELOG.md.
+   - **SPEC:** Update `tasks.md` with all checkboxes checked. If `CHANGELOG.md` exists, update it; otherwise skip.
    - **ISSUE:** Comment on the issue:
      ```bash
      gh issue comment <number> --body "Implementation complete on branch \`$(git branch --show-current)\`. Changes: <summary of files changed and tests written>"
