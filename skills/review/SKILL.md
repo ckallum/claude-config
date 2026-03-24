@@ -57,8 +57,21 @@ IFS=':' read -r ADVERSARY_CLI ADVERSARY_MODEL <<< "<converse-value>"
 | `gemini` | `-m <model>` | CLI default | `gemini [-m <model>] -p "prompt" > "$CONVERSE_TMPDIR/file.txt"` |
 | `claude` | `--model <model>` | CLI default | `claude [--model <model>] --print "prompt" > "$CONVERSE_TMPDIR/file.txt"` |
 
-Build the model flag:
+Validate the CLI is supported and installed:
 ```bash
+# Allowlist check — reject unknown CLIs immediately
+case "$ADVERSARY_CLI" in
+  codex|gemini|claude) ;;
+  *) echo "Unsupported CLI: $ADVERSARY_CLI"; exit 1 ;;
+esac
+
+# Existence check — stop if not installed
+command -v "$ADVERSARY_CLI" >/dev/null 2>&1 || {
+  echo "CLI '$ADVERSARY_CLI' not found. Install it first."
+  exit 1
+}
+
+# Build model flag
 MODEL_FLAG=""
 if [ -n "$ADVERSARY_MODEL" ]; then
   case "$ADVERSARY_CLI" in
@@ -69,11 +82,20 @@ if [ -n "$ADVERSARY_MODEL" ]; then
 fi
 ```
 
-If the CLI is not installed, **STOP**: "CLI `<cli>` not found. Install it first."
+### CLI dispatch helper
 
-Verify the CLI exists:
+Use the appropriate invocation per CLI. All three execution phases use this pattern:
 ```bash
-which $ADVERSARY_CLI || echo "NOT_FOUND"
+# Usage: run_adversary <output-file> [&]
+# Reads prompt from stdin, writes response to <output-file>
+run_adversary() {
+  local outfile="$1"
+  case "$ADVERSARY_CLI" in
+    codex)  codex exec $MODEL_FLAG -o "$outfile" - ;;
+    gemini) gemini $MODEL_FLAG -p "$(cat -)" > "$outfile" ;;
+    claude) claude $MODEL_FLAG --print "$(cat -)" > "$outfile" ;;
+  esac
+}
 ```
 
 ### Converse workflow
@@ -97,7 +119,7 @@ git diff origin/main > "$CONVERSE_TMPDIR/diff.txt"
 Start the other model's independent review in the background BEFORE Claude begins its own review. Pipe the diff and a review prompt via stdin. Use **unquoted** heredoc delimiter so `$(cat ...)` expands:
 
 ```bash
-cat <<PROMPT_EOF | codex exec $MODEL_FLAG -o "$CONVERSE_TMPDIR/adversary-review.txt" - &
+cat <<PROMPT_EOF | run_adversary "$CONVERSE_TMPDIR/adversary-review.txt" &
 You are a code reviewer. Below is a diff. Perform a thorough code review.
 
 For each issue found, output:
@@ -133,7 +155,7 @@ Both reviews are now complete — neither has seen the other's findings.
 Now both models have independent findings. Send BOTH sets to the adversary and ask it to compare:
 
 ```bash
-cat <<PROMPT_EOF | codex exec $MODEL_FLAG -o "$CONVERSE_TMPDIR/round-1.txt" -
+cat <<PROMPT_EOF | run_adversary "$CONVERSE_TMPDIR/round-1.txt"
 You previously reviewed a diff and found these issues:
 
 YOUR FINDINGS:
@@ -171,7 +193,7 @@ For each round:
 4. Send Claude's responses back to the adversary:
 
 ```bash
-cat <<PROMPT_EOF | codex exec $MODEL_FLAG -o "$CONVERSE_TMPDIR/round-N.txt" -
+cat <<PROMPT_EOF | run_adversary "$CONVERSE_TMPDIR/round-N.txt"
 Continuing the code review debate. Only respond to unresolved items.
 
 For each item, respond:
