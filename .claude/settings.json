@@ -219,7 +219,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "rm -f .claude/flow-trace-${CLAUDE_SESSION_ID}.jsonl"
+            "command": "rm -f \"${CLAUDE_PROJECT_DIR:-.}/.claude/flow-trace-${CLAUDE_SESSION_ID}.jsonl\""
           }
         ],
         "description": "Clean up flow trace files"

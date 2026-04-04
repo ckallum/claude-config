@@ -300,7 +300,7 @@ Read the PR body template at `skills/ship/pr-template.md` and follow its structu
 Before creating the PR, check if a flow trace file exists for this session and is non-empty:
 
 ```bash
-test -s ".claude/flow-trace-${CLAUDE_SESSION_ID}.jsonl"
+test -s "${CLAUDE_PROJECT_DIR:-.}/.claude/flow-trace-${CLAUDE_SESSION_ID}.jsonl"
 ```
 
 If the file exists and is non-empty, parse the JSONL entries and generate a Mermaid `flowchart TD` diagram following the same rules as the `/flow` skill:

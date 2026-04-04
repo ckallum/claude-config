@@ -21,7 +21,7 @@ You are running the `/flow` skill. Generate a Mermaid diagram showing the develo
 The trace file is at `.claude/flow-trace-{CLAUDE_SESSION_ID}.jsonl` in the project root. The `CLAUDE_SESSION_ID` environment variable identifies the current session.
 
 ```bash
-cat ".claude/flow-trace-${CLAUDE_SESSION_ID}.jsonl"
+cat "${CLAUDE_PROJECT_DIR:-.}/.claude/flow-trace-${CLAUDE_SESSION_ID}.jsonl"
 ```
 
 If the file is missing or empty, respond with:

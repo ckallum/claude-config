@@ -229,10 +229,12 @@ Reassemble the body from the parsed/modified sections, write to a temp file, and
 
 ```bash
 tmp_body_file="$(mktemp)"
+trap 'rm -f "$tmp_body_file"' EXIT
 cat >"$tmp_body_file" <<'EOF'
 <reassembled body>
 EOF
 gh pr edit <number> --body-file "$tmp_body_file"
+trap - EXIT
 rm -f "$tmp_body_file"
 ```
 
