@@ -69,10 +69,13 @@ function parsePrBody(body) {
  * Takes the same structure returned by parsePrBody.
  */
 function assemblePrBody(parsed) {
-  let body = parsed.preamble;
+  let body = parsed.preamble || '';
 
   for (const section of parsed.sections) {
-    body += '## ' + section.name + '\n' + section.content;
+    if (body && !body.endsWith('\n')) {
+      body += '\n';
+    }
+    body += '## ' + section.name + '\n' + (section.content || '');
   }
 
   return body;
