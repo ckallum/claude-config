@@ -1,4 +1,4 @@
-# claude-config
+# calsuite
 
 Personal Claude Code configuration — hooks, commands, scripts, plugins, skills, and agents.
 
