@@ -1,0 +1,9 @@
+{
+  "targets": [
+    { "path": "~/Projects/verity" },
+    { "path": "~/Projects/timeline" },
+    { "path": "~/Projects/museli" },
+    { "path": "~/Projects/cake" },
+    { "path": "~/Projects/elliente" }
+  ]
+}
