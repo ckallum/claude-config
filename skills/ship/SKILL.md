@@ -251,10 +251,11 @@ git push -u origin $(git branch --show-current)
 
 ## Step 7.5: Generate Development Flow diagram
 
-Before creating the PR, check if a flow trace file exists for this session and is non-empty:
+Before creating the PR, check if a flow trace file exists for this session and is non-empty. Use the `:-unknown` fallback so the path still resolves when `CLAUDE_SESSION_ID` is unset (matching the convention used by calsuite's other session-scoped trackers, e.g. `skill-usage-tracker.cjs`):
 
 ```bash
-test -s ".claude/flow-trace-${CLAUDE_SESSION_ID}.jsonl"
+session_id="${CLAUDE_SESSION_ID:-unknown}"
+test -s ".claude/flow-trace-${session_id}.jsonl"
 ```
 
 If the file exists and is non-empty, read and parse the JSONL entries and generate a Mermaid `flowchart TD` diagram following the same rules as the `/flow` skill:

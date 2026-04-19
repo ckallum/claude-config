@@ -51,7 +51,7 @@ function parsePrBody(body) {
 
     if (newlineIndex === -1) {
       // Section header with no content after it
-      name = part.replace(/^## /, '').trim();
+      name = part.slice(3).trim();
       content = '';
     } else {
       name = part.slice(3, newlineIndex).trim();
