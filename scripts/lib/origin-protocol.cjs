@@ -37,7 +37,9 @@ function stampOrigin(content, originValue) {
   }
   let newBody;
   if (ORIGIN_LINE_RE.test(parsed.rawBody)) {
-    newBody = parsed.rawBody.replace(ORIGIN_LINE_RE, `_origin: ${originValue}`);
+    // Function replacer — string form would interpret `$1`/`$&` sequences
+    // if originValue ever contained them (target basenames in exotic dirs).
+    newBody = parsed.rawBody.replace(ORIGIN_LINE_RE, () => `_origin: ${originValue}`);
   } else {
     newBody = `_origin: ${originValue}\n${parsed.rawBody}`;
   }
@@ -79,29 +81,61 @@ function normalizeForCompare(content) {
 }
 
 /**
- * Read the content a file had at a given git sha inside calsuite. Returns
- * null if the path didn't exist at that sha (or git isn't available).
+ * Read the content a file had at a given git sha inside calsuite.
+ *
+ * Returns null ONLY when git reports the path/sha is unknown to the repo
+ * (benign: "file didn't exist at that commit"). Any other failure — git not
+ * installed, shallow-clone pruning, repo corruption — throws, because the
+ * caller's `skip-unknown` path would otherwise silently route every managed
+ * file to the divergence queue on every sync.
  */
 function contentAtSha(calsuiteRelPath, sha, calsuiteDir) {
   try {
     return execFileSync('git', ['show', `${sha}:${calsuiteRelPath}`], {
       cwd: calsuiteDir,
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
-  } catch {
-    return null;
+  } catch (err) {
+    const stderr = err.stderr ? err.stderr.toString() : '';
+    const benignMissing =
+      /fatal: invalid object name/i.test(stderr) ||
+      /fatal: bad revision/i.test(stderr) ||
+      /path .* does not exist in/i.test(stderr) ||
+      /exists on disk, but not in/i.test(stderr);
+    if (benignMissing) return null;
+
+    throw new Error(
+      `git show ${sha}:${calsuiteRelPath} failed unexpectedly in ${calsuiteDir}.\n` +
+      `This is not a "path didn't exist at that sha" error — the _origin protocol ` +
+      `cannot proceed without historical content comparison.\n` +
+      `Git reported: ${stderr.trim() || err.message}`
+    );
   }
 }
 
+/**
+ * Return calsuite's current HEAD sha (7-char). Throws on failure rather
+ * than returning a fallback string — stamping every file with
+ * `_origin: calsuite@<fallback>` would break future syncs permanently,
+ * because `contentAtSha(..., <fallback>, ...)` would return null for
+ * every file and route them all to skip-unknown.
+ */
 function currentCalsuiteSha(calsuiteDir) {
   try {
     return execFileSync('git', ['rev-parse', '--short=7', 'HEAD'], {
       cwd: calsuiteDir,
       encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
-  } catch {
-    return 'unknown';
+  } catch (err) {
+    const stderr = err.stderr ? err.stderr.toString() : '';
+    throw new Error(
+      `Unable to determine calsuite HEAD sha via 'git rev-parse' in ${calsuiteDir}.\n` +
+      `The _origin protocol requires a real sha to stamp into every distributed file.\n` +
+      `Git reported: ${stderr.trim() || err.message}\n` +
+      `Fix: ensure calsuite is a git checkout with an accessible HEAD (not detached, not shallow-pruned, git binary on PATH).`
+    );
   }
 }
 

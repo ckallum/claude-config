@@ -17,10 +17,12 @@
  *   --sync                       Re-run install against all targets in config/targets.json
  *   --force-adopt <path>         Overwrite a target skill/agent file with calsuite's
  *                                current version. Discards local edits. Stamps fresh
- *                                `_origin: calsuite@<sha>`.
+ *                                `_origin: calsuite@<sha>`. Prompts for confirmation;
+ *                                pass --yes (or -y) to skip the prompt.
  *   --claim <path>               Mark a target skill/agent file as user-owned. Stamps
  *                                `_origin: <target-name>` in frontmatter, preserves
  *                                content. Subsequent syncs never touch it.
+ *   --yes, -y                    Skip confirmation prompts for destructive operations.
  *   --copy                       (deprecated, no-op) formerly toggled script copy vs symlink;
  *                                hook scripts are now referenced directly from $CALSUITE_DIR
  */
@@ -86,8 +88,12 @@ function installProtectedFile({ srcFile, destFile, calsuiteDir, currentSha, stat
   fs.mkdirSync(path.dirname(destFile), { recursive: true });
 
   if (!srcFile.endsWith('.md')) {
+    // Non-markdown files inside a skill dir use copy-no-overwrite semantics
+    // (they can't host YAML frontmatter, so the _origin protocol doesn't
+    // apply). A pre-existing file at dest means "leave alone" — this is
+    // not the same as user-claimed; separate counter to avoid confusing logs.
     if (fs.existsSync(destFile)) {
-      stats['skip-claimed']++;
+      stats['skip-exists'] = (stats['skip-exists'] || 0) + 1;
       return;
     }
     fs.copyFileSync(srcFile, destFile);
@@ -257,11 +263,27 @@ function mergeHooks(existingHooks, newHooks) {
   return merged;
 }
 
+/**
+ * Read and parse a JSON file. Returns null if the file is missing (ENOENT)
+ * — a common and benign case — so callers can idiom `readJsonSync(...) || {}`.
+ * THROWS on parse errors; silently returning null for malformed JSON would
+ * let the installer rebuild the file from scratch, wiping user content.
+ */
 function readJsonSync(filePath) {
+  let raw;
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch {
-    return null;
+    raw = fs.readFileSync(filePath, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return null;
+    throw new Error(`Failed to read ${filePath}: ${err.message}`);
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    throw new Error(
+      `${filePath} is not valid JSON (${err.message}).\n` +
+      `Refusing to overwrite — fix or delete the file manually, then re-run the installer.`
+    );
   }
 }
 
@@ -505,7 +527,7 @@ function installForProfile(targetDir, resolvedProfile, label, opts = {}) {
   //    with `_origin: calsuite@<sha>` stamped into its frontmatter.
   //    Existing files with local edits are detected and preserved.
   const destSkills = path.join(claudeDir, 'skills');
-  const skillStats = { 'write-new': 0, 'write-update': 0, 'migrate': 0, 'skip-diverged': 0, 'skip-unknown': 0, 'skip-claimed': 0 };
+  const skillStats = { 'write-new': 0, 'write-update': 0, 'migrate': 0, 'skip-diverged': 0, 'skip-unknown': 0, 'skip-claimed': 0, 'skip-exists': 0 };
   const divergences = opts.divergences || [];
   for (const skillName of resolvedProfile.skills) {
     if (INTERNAL_SKILLS.has(skillName)) continue;
@@ -519,12 +541,16 @@ function installForProfile(targetDir, resolvedProfile, label, opts = {}) {
   }
   const written = skillStats['write-new'] + skillStats['write-update'] + skillStats['migrate'];
   const skipped = skillStats['skip-diverged'] + skillStats['skip-unknown'];
-  console.log(`  ✓ Skills: ${written} written (${skillStats['write-new']} new / ${skillStats['write-update']} updated / ${skillStats['migrate']} migrated), ${skipped} skipped${skillStats['skip-claimed'] ? `, ${skillStats['skip-claimed']} user-claimed` : ''}`);
+  const preserved = skillStats['skip-claimed'] + skillStats['skip-exists'];
+  const preservedBreakdown = [];
+  if (skillStats['skip-claimed']) preservedBreakdown.push(`${skillStats['skip-claimed']} user-claimed`);
+  if (skillStats['skip-exists']) preservedBreakdown.push(`${skillStats['skip-exists']} non-md kept`);
+  console.log(`  ✓ Skills: ${written} written (${skillStats['write-new']} new / ${skillStats['write-update']} updated / ${skillStats['migrate']} migrated), ${skipped} skipped${preserved ? `, ${preservedBreakdown.join(' / ')}` : ''}`);
 
   // 4. Install agents via the same protocol (agent files are single .md each)
   if (resolvedProfile.agents.length > 0) {
     const destAgents = path.join(claudeDir, 'agents');
-    const agentStats = { 'write-new': 0, 'write-update': 0, 'migrate': 0, 'skip-diverged': 0, 'skip-unknown': 0, 'skip-claimed': 0 };
+    const agentStats = { 'write-new': 0, 'write-update': 0, 'migrate': 0, 'skip-diverged': 0, 'skip-unknown': 0, 'skip-claimed': 0, 'skip-exists': 0 };
     for (const agentName of resolvedProfile.agents) {
       const srcAgent = path.join(AGENTS_DIR, `${agentName}.md`);
       if (!fs.existsSync(srcAgent)) continue;
@@ -678,14 +704,19 @@ function installCcstatuslineConfig(manifest) {
  * Usage: node configure-claude.js <target> --only review,qa,ship
  *        node configure-claude.js <target> --only review,qa --agents code-reviewer
  */
-function installOnly(targetDir, onlySkills, onlyAgents) {
+function installOnly(targetDir, onlySkills, onlyAgents, outerDivergences = null) {
   const claudeDir = path.join(targetDir, '.claude');
   fs.mkdirSync(claudeDir, { recursive: true });
+  const calsuiteDir = resolveCalsuiteDir();
+  const currentSha = originProtocol.currentCalsuiteSha(calsuiteDir);
   const missing = [];
+  const divergences = outerDivergences || [];
 
-  // Install specified skills
+  // Install specified skills (routed through the _origin safe-overwrite
+  // protocol so explicit --only installs never silently clobber local edits).
   if (onlySkills.length > 0) {
     const destSkills = path.join(claudeDir, 'skills');
+    const stats = { 'write-new': 0, 'write-update': 0, 'migrate': 0, 'skip-diverged': 0, 'skip-unknown': 0, 'skip-claimed': 0, 'skip-exists': 0 };
     let count = 0;
     for (const skillName of onlySkills) {
       if (INTERNAL_SKILLS.has(skillName)) {
@@ -694,34 +725,43 @@ function installOnly(targetDir, onlySkills, onlyAgents) {
       }
       const srcSkill = path.join(SKILLS_DIR, skillName);
       if (fs.existsSync(srcSkill) && fs.statSync(srcSkill).isDirectory()) {
-        copyDirSync(srcSkill, path.join(destSkills, skillName));
+        for (const srcFile of listFilesRecursive(srcSkill)) {
+          const relFromSkills = path.relative(SKILLS_DIR, srcFile);
+          const destFile = path.join(destSkills, relFromSkills);
+          installProtectedFile({ srcFile, destFile, calsuiteDir, currentSha, stats, divergences });
+        }
         count++;
-        console.log(`  ✓ Installed skill: ${skillName}`);
+        console.log(`  ✓ Processed skill: ${skillName}`);
       } else {
         console.log(`  ✗ Skill not found: ${skillName}`);
         missing.push(`skill:${skillName}`);
       }
     }
-    console.log(`  → ${count} skill(s) installed to ${destSkills}`);
+    const written = stats['write-new'] + stats['write-update'] + stats['migrate'];
+    const skipped = stats['skip-diverged'] + stats['skip-unknown'];
+    console.log(`  → ${count} skill(s): ${written} files written, ${skipped} skipped, ${stats['skip-claimed'] + stats['skip-exists']} preserved`);
   }
 
-  // Install specified agents
+  // Install specified agents through the same protocol.
   if (onlyAgents.length > 0) {
     const destAgents = path.join(claudeDir, 'agents');
-    fs.mkdirSync(destAgents, { recursive: true });
+    const stats = { 'write-new': 0, 'write-update': 0, 'migrate': 0, 'skip-diverged': 0, 'skip-unknown': 0, 'skip-claimed': 0, 'skip-exists': 0 };
     let count = 0;
     for (const agentName of onlyAgents) {
       const srcAgent = path.join(AGENTS_DIR, `${agentName}.md`);
       if (fs.existsSync(srcAgent)) {
-        fs.copyFileSync(srcAgent, path.join(destAgents, `${agentName}.md`));
+        const destAgent = path.join(destAgents, `${agentName}.md`);
+        installProtectedFile({ srcFile: srcAgent, destFile: destAgent, calsuiteDir, currentSha, stats, divergences });
         count++;
-        console.log(`  ✓ Installed agent: ${agentName}`);
+        console.log(`  ✓ Processed agent: ${agentName}`);
       } else {
         console.log(`  ✗ Agent not found: ${agentName}`);
         missing.push(`agent:${agentName}`);
       }
     }
-    console.log(`  → ${count} agent(s) installed to ${destAgents}`);
+    const written = stats['write-new'] + stats['write-update'] + stats['migrate'];
+    const skipped = stats['skip-diverged'] + stats['skip-unknown'];
+    console.log(`  → ${count} agent(s): ${written} written, ${skipped} skipped`);
   }
 
   // Also install into workspaces if monorepo
@@ -730,11 +770,16 @@ function installOnly(targetDir, onlySkills, onlyAgents) {
     const workspaces = findWorkspaces(targetDir);
     for (const ws of workspaces) {
       console.log(`\n  Workspace: ${ws.name}`);
-      const wsMissing = installOnly(ws.path, onlySkills, onlyAgents);
+      const wsMissing = installOnly(ws.path, onlySkills, onlyAgents, divergences);
       missing.push(...wsMissing);
     }
   }
 
+  // Top-level callers print the divergence summary once; if invoked without an
+  // outer list we're the top-level — print here.
+  if (!outerDivergences) {
+    printDivergenceSummary(divergences);
+  }
   return missing;
 }
 
@@ -803,7 +848,23 @@ function deriveTargetName(destPath) {
   return path.basename(targetDir);
 }
 
-function handleForceAdopt(targetPath) {
+function promptYesNo(question) {
+  // Sync stdin read — no readline dep. Returns true iff the user typed y/yes.
+  // Non-TTY stdin (scripts, CI) returns false unless `--yes` already bypassed this.
+  if (!process.stdin.isTTY) return false;
+  process.stdout.write(`${question} [y/N] `);
+  const buf = Buffer.alloc(16);
+  let bytesRead = 0;
+  try {
+    bytesRead = fs.readSync(0, buf, 0, 16, null);
+  } catch {
+    return false;
+  }
+  const answer = buf.slice(0, bytesRead).toString('utf8').trim().toLowerCase();
+  return answer === 'y' || answer === 'yes';
+}
+
+function handleForceAdopt(targetPath, { assumeYes = false } = {}) {
   const destPath = path.resolve(targetPath);
   const calsuiteRel = destToCalsuiteRel(destPath);
   if (!calsuiteRel) {
@@ -816,6 +877,18 @@ function handleForceAdopt(targetPath) {
     console.error(`  ✗ Calsuite has no matching source file: ${srcFile}`);
     process.exit(1);
   }
+
+  if (!assumeYes) {
+    const destExists = fs.existsSync(destPath);
+    const warning = destExists
+      ? `Overwrite ${destPath} with calsuite's current version? Any local edits will be lost.`
+      : `Write calsuite's current content to ${destPath}?`;
+    if (!promptYesNo(warning)) {
+      console.log('  ⊘ Aborted. Re-run with --yes to skip the prompt.');
+      process.exit(1);
+    }
+  }
+
   const currentSha = originProtocol.currentCalsuiteSha(calsuiteDir);
   const content = fs.readFileSync(srcFile, 'utf8');
   const stamped = originProtocol.stampOrigin(content, `calsuite@${currentSha}`);
@@ -864,6 +937,8 @@ function parseArgv() {
       flags.sync = true;
     } else if (args[i] === '--copy') {
       flags.copy = true;
+    } else if (args[i] === '--yes' || args[i] === '-y') {
+      flags.yes = true;
     } else if (args[i] === '--force-adopt') {
       const next = args[i + 1];
       if (!next || next.startsWith('--')) {
@@ -902,7 +977,7 @@ function main() {
   // Handle --force-adopt and --claim early — they touch a single file
   // and shouldn't trigger a full install.
   if (flags.forceAdopt) {
-    handleForceAdopt(flags.forceAdopt);
+    handleForceAdopt(flags.forceAdopt, { assumeYes: flags.yes });
     return;
   }
   if (flags.claim) {
@@ -1130,4 +1205,11 @@ function checkGlobalSettings(manifest, projectSettingsPaths) {
   }
 }
 
-main();
+try {
+  main();
+} catch (err) {
+  // Errors thrown by origin-protocol utilities carry user-facing messages
+  // already. Print cleanly, exit non-zero, skip the noisy Node stack trace.
+  console.error(`\n  ✗ ${err.message}`);
+  process.exit(1);
+}
