@@ -19,6 +19,55 @@ agents/      # Agent definitions (@context-loader, @doc-updater, @browser, @code
 templates/   # Spec, doc, and changelog templates
 ```
 
+## Distribution model
+
+Calsuite is the single source of truth. Assets flow out to three tiers — each with a mechanism tuned to how the asset is meant to be edited downstream.
+
+```mermaid
+flowchart LR
+    subgraph SRC["calsuite/ (source of truth)"]
+        direction TB
+        C1["scripts/hooks/*<br/>scripts/lib/*"]
+        C2["skills/*<br/>agents/*"]
+        C3["hooks/hooks.json"]
+        C4["config/*.json<br/>config/lint-configs/*<br/>templates/specs/"]
+        C5["config/global-settings.json"]
+    end
+
+    subgraph SHARED["~/Projects/.claude/ (user-wide)"]
+        P1["skills/<br/>agents/"]
+    end
+
+    subgraph TGT["~/Projects/&lt;repo&gt;/.claude/ (per target)"]
+        T1["scripts/hooks/<br/>scripts/lib/"]
+        T2["settings.json"]
+        T3["config/, specs/<br/>root: .eslintrc.json"]
+    end
+
+    subgraph GBL["~/.claude/ (per user)"]
+        G1["settings.json<br/>~/.mcp.json"]
+    end
+
+    C1 ==>|symlink| T1
+    C2 ==>|symlink| P1
+    C3 ==>|merge by _origin| T2
+    C4 ==>|copy, no-overwrite| T3
+    C5 ==>|merge| G1
+
+    P1 -.->|Claude Code config hierarchy<br/>parent dir → child repo| TGT
+```
+
+| Asset | Mechanism | Landing zone | Local override |
+|---|---|---|---|
+| Skills, agents | Symlink once into parent | `~/Projects/.claude/skills/`, `agents/` | `--only <skill>` / `--only-agents <name>` writes a per-target copy |
+| Hook scripts, lib scripts | Symlink into each target | `.claude/scripts/` per target | `--copy` flag forces real copies |
+| Hook config | Merge by `_origin: calsuite` tag | `.claude/settings.json` per target | Project hook entries without `_origin` are preserved |
+| Configs, templates, lint, MCP | Copy (no-overwrite) / merge | `.claude/config/`, `.eslintrc.json`, `.claude/specs/`, `~/.claude/settings.json`, `~/.mcp.json` | Existing files are never touched |
+
+**Why three tiers?** Skills and agents live once at the parent `~/Projects/.claude/` and every repo under it inherits them via Claude Code's config hierarchy — so editing a skill in calsuite propagates instantly, and no per-target copy can be accidentally clobbered on re-sync. Hook scripts need a path-stable `.claude/scripts/` inside each project, so they're symlinked per-target (still live, just scoped). Configs and templates are copied because projects are expected to diverge (e.g. a project's own ESLint overrides). `hooks.json` is a merge file, so entries are tagged `_origin: calsuite` to let `mergeHooks()` replace upstream entries while preserving project-local ones.
+
+**Propagation.** The repo's `.git/hooks/post-commit` auto-runs `configure-claude.js --sync` whenever a commit touches `hooks/`, `skills/`, `agents/`, `scripts/`, or `config/`, so targets listed in `config/targets.json` pick up changes without manual intervention.
+
 ## Mono-repo Support
 
 The installer auto-detects project type via `config/profiles.json`:
