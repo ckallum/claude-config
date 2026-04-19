@@ -21,6 +21,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const originProtocol = require('./lib/origin-protocol.cjs');
 
 const CONFIG_REPO = path.resolve(__dirname, '..');
 const HOOKS_JSON = path.join(CONFIG_REPO, 'hooks', 'hooks.json');
@@ -63,6 +64,64 @@ function substituteCalsuiteDir(hooksObj, calsuiteDir) {
   const json = JSON.stringify(hooksObj);
   const safeDir = calsuiteDir.replace(/\\/g, '\\\\');
   return JSON.parse(json.replace(/\$\{CALSUITE_DIR\}/g, () => safeDir));
+}
+
+/**
+ * Install one calsuite-managed file into a target, respecting the
+ * `_origin` safe-overwrite protocol for markdown files. Non-markdown
+ * files use copy-no-overwrite semantics (simpler; can be promoted to
+ * sidecar-`.origin` tracking later if it matters).
+ *
+ * Mutates `stats` (an object with per-action counters) and `divergences`
+ * (an array of { destPath, action, reason }) so the caller can aggregate
+ * across many files.
+ */
+function installProtectedFile({ srcFile, destFile, calsuiteDir, currentSha, stats, divergences }) {
+  fs.mkdirSync(path.dirname(destFile), { recursive: true });
+
+  if (!srcFile.endsWith('.md')) {
+    if (fs.existsSync(destFile)) {
+      stats['skip-claimed']++;
+      return;
+    }
+    fs.copyFileSync(srcFile, destFile);
+    stats['write-new']++;
+    return;
+  }
+
+  const calsuiteRelPath = path.relative(calsuiteDir, srcFile);
+  const decision = originProtocol.decideFileAction(destFile, calsuiteRelPath, calsuiteDir);
+  stats[decision.action] = (stats[decision.action] || 0) + 1;
+
+  if (decision.action === 'write-new' || decision.action === 'write-update' || decision.action === 'migrate') {
+    const srcContent = fs.readFileSync(srcFile, 'utf8');
+    const stamped = originProtocol.stampOrigin(srcContent, `calsuite@${currentSha}`);
+    fs.writeFileSync(destFile, stamped);
+    return;
+  }
+
+  if (decision.action === 'skip-diverged' || decision.action === 'skip-unknown') {
+    divergences.push({ destPath: destFile, action: decision.action, reason: decision.reason });
+  }
+}
+
+/**
+ * Recursively list every file under a directory as absolute paths.
+ * Skips `.claude/` and any dot-prefixed directories.
+ */
+function listFilesRecursive(dir) {
+  const out = [];
+  if (!fs.existsSync(dir)) return out;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith('.')) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...listFilesRecursive(full));
+    } else if (entry.isFile()) {
+      out.push(full);
+    }
+  }
+  return out;
 }
 
 function copyDirSync(src, dest) {
@@ -262,6 +321,8 @@ function findWorkspaces(targetDir) {
 function installForProfile(targetDir, resolvedProfile, label, opts = {}) {
   const claudeDir = path.join(targetDir, '.claude');
   const settingsPath = path.join(claudeDir, 'settings.json');
+  const calsuiteDir = resolveCalsuiteDir();
+  const currentSha = originProtocol.currentCalsuiteSha(calsuiteDir);
 
   console.log(`\n--- Installing: ${label} (${targetDir}) ---\n`);
 
@@ -320,32 +381,40 @@ function installForProfile(targetDir, resolvedProfile, label, opts = {}) {
     console.log(`  ✓ ESLint config already exists (skipped)`);
   }
 
-  // 3. Copy skills (only those in resolved profile)
+  // 3. Install skills via the _origin safe-overwrite protocol.
+  //    Every markdown file under each profile-listed skill dir is copied
+  //    with `_origin: calsuite@<sha>` stamped into its frontmatter.
+  //    Existing files with local edits are detected and preserved.
   const destSkills = path.join(claudeDir, 'skills');
-  let skillCount = 0;
+  const skillStats = { 'write-new': 0, 'write-update': 0, 'migrate': 0, 'skip-diverged': 0, 'skip-unknown': 0, 'skip-claimed': 0 };
+  const divergences = opts.divergences || [];
   for (const skillName of resolvedProfile.skills) {
     if (INTERNAL_SKILLS.has(skillName)) continue;
     const srcSkill = path.join(SKILLS_DIR, skillName);
-    if (fs.existsSync(srcSkill) && fs.statSync(srcSkill).isDirectory()) {
-      copyDirSync(srcSkill, path.join(destSkills, skillName));
-      skillCount++;
+    if (!fs.existsSync(srcSkill) || !fs.statSync(srcSkill).isDirectory()) continue;
+    for (const srcFile of listFilesRecursive(srcSkill)) {
+      const relFromSkills = path.relative(SKILLS_DIR, srcFile);
+      const destFile = path.join(destSkills, relFromSkills);
+      installProtectedFile({ srcFile, destFile, calsuiteDir, currentSha, stats: skillStats, divergences });
     }
   }
-  console.log(`  ✓ Copied ${skillCount} skill(s) → ${destSkills}`);
+  const written = skillStats['write-new'] + skillStats['write-update'] + skillStats['migrate'];
+  const skipped = skillStats['skip-diverged'] + skillStats['skip-unknown'];
+  console.log(`  ✓ Skills: ${written} written (${skillStats['write-new']} new / ${skillStats['write-update']} updated / ${skillStats['migrate']} migrated), ${skipped} skipped${skillStats['skip-claimed'] ? `, ${skillStats['skip-claimed']} user-claimed` : ''}`);
 
-  // 4. Copy agents (only those in resolved profile)
+  // 4. Install agents via the same protocol (agent files are single .md each)
   if (resolvedProfile.agents.length > 0) {
     const destAgents = path.join(claudeDir, 'agents');
-    fs.mkdirSync(destAgents, { recursive: true });
-    let agentCount = 0;
+    const agentStats = { 'write-new': 0, 'write-update': 0, 'migrate': 0, 'skip-diverged': 0, 'skip-unknown': 0, 'skip-claimed': 0 };
     for (const agentName of resolvedProfile.agents) {
       const srcAgent = path.join(AGENTS_DIR, `${agentName}.md`);
-      if (fs.existsSync(srcAgent)) {
-        fs.copyFileSync(srcAgent, path.join(destAgents, `${agentName}.md`));
-        agentCount++;
-      }
+      if (!fs.existsSync(srcAgent)) continue;
+      const destAgent = path.join(destAgents, `${agentName}.md`);
+      installProtectedFile({ srcFile: srcAgent, destFile: destAgent, calsuiteDir, currentSha, stats: agentStats, divergences });
     }
-    console.log(`  ✓ Copied ${agentCount} agent(s) → ${destAgents}`);
+    const aWritten = agentStats['write-new'] + agentStats['write-update'] + agentStats['migrate'];
+    const aSkipped = agentStats['skip-diverged'] + agentStats['skip-unknown'];
+    console.log(`  ✓ Agents: ${aWritten} written, ${aSkipped} skipped${agentStats['skip-claimed'] ? `, ${agentStats['skip-claimed']} user-claimed` : ''}`);
   }
 
   // 5. Copy templates (never overwrite existing)
@@ -391,7 +460,6 @@ function installForProfile(targetDir, resolvedProfile, label, opts = {}) {
   // Substitute ${CALSUITE_DIR} with the literal absolute path. Claude Code's
   // hook runner does not shell-expand command strings, so $VAR syntax cannot
   // resolve at runtime — the installer must resolve it now.
-  const calsuiteDir = resolveCalsuiteDir();
   const resolvedHooks = substituteCalsuiteDir(hooksConfig.hooks, calsuiteDir);
 
   // 7. Write calsuite hooks into settings.local.json (gitignored, per-user).
