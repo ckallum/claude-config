@@ -151,7 +151,12 @@ Each collaborator runs the installer themselves — there is no expectation that
 
 ## Out of scope / future work
 
-- `/reconcile-targets` agentic skill — on-demand LLM-mediated review of flagged divergences, upstream/cross-port decisions, PR opening. Second-layer on top of this mechanical sync.
-- `--prune-stale` flag — opt-in cleanup of orphaned dirs/files left over from prior distribution models (old `.claude/skills/`, old `~/Projects/.claude/*`).
-- `--reconcile <path>` interactive helper for individual file divergences.
-- Hash manifest vs. `git show` — revisit if `git show` performance becomes a bottleneck with many targets.
+Tracked as issues so they don't get lost:
+
+- **[#40](https://github.com/ckallum/calsuite/issues/40) — `/reconcile-targets` agentic skill.** On-demand LLM-mediated review of flagged divergences, upstream/cross-port decisions, PR opening. Second-layer on top of this mechanical sync.
+- **[#41](https://github.com/ckallum/calsuite/issues/41) — `--prune-stale` flag.** Opt-in cleanup of orphaned dirs/files left over from prior distribution models (old `.claude/scripts/`, old `~/Projects/.claude/*`, stale pre-protocol skill copies).
+- **[#42](https://github.com/ckallum/calsuite/issues/42) — `--reconcile <path>` interactive helper.** Single-file divergence resolver with three-way merge support.
+
+Not tracked as an issue (monitor and revisit if/when it matters):
+
+- **Hash manifest vs. `git show`** — the current design uses `git show <sha>:<path>` inside `$CALSUITE_DIR` to retrieve historical calsuite content. If performance becomes a bottleneck with many targets (e.g. 20+ repos × dozens of files per sync), consider pre-computing and shipping a hash manifest instead. No action until measured.
