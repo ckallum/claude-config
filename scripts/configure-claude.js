@@ -32,7 +32,6 @@ const AGENTS_DIR = path.join(CONFIG_REPO, 'agents');
 const TEMPLATES_DIR = path.join(CONFIG_REPO, 'templates');
 const LINT_CONFIGS_DIR = path.join(CONFIG_REPO, 'config', 'lint-configs');
 const TARGETS_JSON = path.join(CONFIG_REPO, 'config', 'targets.json');
-const PARENT_CLAUDE_DIR = path.join(CONFIG_REPO, '..', '.claude');
 const HOME_DIR = require('os').homedir();
 const HOME_SETTINGS = path.join(HOME_DIR, '.claude', 'settings.json');
 const HOME_SETTINGS_LOCAL = path.join(HOME_DIR, '.claude', 'settings.local.json');
@@ -543,39 +542,6 @@ function installOnly(targetDir, onlySkills, onlyAgents) {
   return missing;
 }
 
-function syncParentAssets() {
-  if (!fs.existsSync(PARENT_CLAUDE_DIR)) {
-    console.log(`  ⚠ Parent .claude dir not found at ${PARENT_CLAUDE_DIR} — skipping shared asset sync`);
-    return;
-  }
-
-  const parentSkillsDir = path.join(PARENT_CLAUDE_DIR, 'skills');
-  const parentAgentsDir = path.join(PARENT_CLAUDE_DIR, 'agents');
-
-  fs.mkdirSync(parentSkillsDir, { recursive: true });
-  fs.mkdirSync(parentAgentsDir, { recursive: true });
-
-  // Symlink shared skills
-  let skillCount = 0;
-  for (const entry of fs.readdirSync(SKILLS_DIR, { withFileTypes: true })) {
-    if (!entry.isDirectory() || INTERNAL_SKILLS.has(entry.name) || entry.name.startsWith('.')) continue;
-    if (symlinkOrSkip(path.join(SKILLS_DIR, entry.name), path.join(parentSkillsDir, entry.name))) {
-      skillCount++;
-    }
-  }
-  console.log(`  ✓ Symlinked ${skillCount} shared skill(s) → ${parentSkillsDir}`);
-
-  // Symlink shared agents
-  let agentCount = 0;
-  for (const entry of fs.readdirSync(AGENTS_DIR, { withFileTypes: true })) {
-    if (!entry.isFile()) continue;
-    if (symlinkOrSkip(path.join(AGENTS_DIR, entry.name), path.join(parentAgentsDir, entry.name))) {
-      agentCount++;
-    }
-  }
-  console.log(`  ✓ Symlinked ${agentCount} shared agent(s) → ${parentAgentsDir}`);
-}
-
 function installTarget(targetDir, profilesConfig, opts = {}) {
   const detectedProfiles = detectProfiles(targetDir);
   if (opts.logProfiles) {
@@ -686,9 +652,6 @@ function main() {
       console.error('  ✗ Could not read profiles.json');
       process.exit(1);
     }
-
-    // Also sync shared skills/agents to parent .claude/
-    syncParentAssets();
 
     for (const target of targets.targets) {
       const targetPath = path.resolve(target.path.replace(/^~/, HOME_DIR));
