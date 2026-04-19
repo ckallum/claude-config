@@ -74,6 +74,33 @@ function substituteCalsuiteDir(hooksObj, calsuiteDir) {
   return JSON.parse(json.replace(/\$\{CALSUITE_DIR\}/g, () => safeDir));
 }
 
+// Actions that should result in (re)writing the destination file.
+const WRITE_ACTIONS = new Set(['write-new', 'write-update', 'migrate']);
+// Actions that indicate a file was skipped and needs user reconciliation.
+const BLOCKING_SKIP_ACTIONS = new Set(['skip-diverged', 'skip-unknown']);
+
+// Fresh counters for every action installProtectedFile can emit.
+function makeInstallStats() {
+  return {
+    'write-new': 0,
+    'write-update': 0,
+    'migrate': 0,
+    'skip-diverged': 0,
+    'skip-unknown': 0,
+    'skip-claimed': 0,
+    'skip-exists': 0,
+  };
+}
+
+// Aggregate a stats object into the three numbers used in log lines.
+function summarizeInstallStats(stats) {
+  return {
+    written: stats['write-new'] + stats['write-update'] + stats['migrate'],
+    skipped: stats['skip-diverged'] + stats['skip-unknown'],
+    preserved: stats['skip-claimed'] + stats['skip-exists'],
+  };
+}
+
 /**
  * Install one calsuite-managed file into a target, respecting the
  * `_origin` safe-overwrite protocol for markdown files. Non-markdown
@@ -93,7 +120,7 @@ function installProtectedFile({ srcFile, destFile, calsuiteDir, currentSha, stat
     // apply). A pre-existing file at dest means "leave alone" — this is
     // not the same as user-claimed; separate counter to avoid confusing logs.
     if (fs.existsSync(destFile)) {
-      stats['skip-exists'] = (stats['skip-exists'] || 0) + 1;
+      stats['skip-exists']++;
       return;
     }
     fs.copyFileSync(srcFile, destFile);
@@ -103,16 +130,16 @@ function installProtectedFile({ srcFile, destFile, calsuiteDir, currentSha, stat
 
   const calsuiteRelPath = path.relative(calsuiteDir, srcFile);
   const decision = originProtocol.decideFileAction(destFile, calsuiteRelPath, calsuiteDir);
-  stats[decision.action] = (stats[decision.action] || 0) + 1;
+  stats[decision.action]++;
 
-  if (decision.action === 'write-new' || decision.action === 'write-update' || decision.action === 'migrate') {
+  if (WRITE_ACTIONS.has(decision.action)) {
     const srcContent = fs.readFileSync(srcFile, 'utf8');
     const stamped = originProtocol.stampOrigin(srcContent, `calsuite@${currentSha}`);
     fs.writeFileSync(destFile, stamped);
     return;
   }
 
-  if (decision.action === 'skip-diverged' || decision.action === 'skip-unknown') {
+  if (BLOCKING_SKIP_ACTIONS.has(decision.action)) {
     divergences.push({ destPath: destFile, action: decision.action, reason: decision.reason });
   }
 }
@@ -181,7 +208,7 @@ function ensureGitignoreEntry(dir) {
  * as designed (user-owned files).
  */
 function printDivergenceSummary(divergences) {
-  const blocking = divergences.filter(d => d.action === 'skip-diverged' || d.action === 'skip-unknown');
+  const blocking = divergences.filter(d => BLOCKING_SKIP_ACTIONS.has(d.action));
   if (blocking.length === 0) return;
   console.log('');
   console.log('  ───────────────────────────────────────────────────────────────');
@@ -527,7 +554,7 @@ function installForProfile(targetDir, resolvedProfile, label, opts = {}) {
   //    with `_origin: calsuite@<sha>` stamped into its frontmatter.
   //    Existing files with local edits are detected and preserved.
   const destSkills = path.join(claudeDir, 'skills');
-  const skillStats = { 'write-new': 0, 'write-update': 0, 'migrate': 0, 'skip-diverged': 0, 'skip-unknown': 0, 'skip-claimed': 0, 'skip-exists': 0 };
+  const skillStats = makeInstallStats();
   const divergences = opts.divergences || [];
   for (const skillName of resolvedProfile.skills) {
     if (INTERNAL_SKILLS.has(skillName)) continue;
@@ -539,27 +566,24 @@ function installForProfile(targetDir, resolvedProfile, label, opts = {}) {
       installProtectedFile({ srcFile, destFile, calsuiteDir, currentSha, stats: skillStats, divergences });
     }
   }
-  const written = skillStats['write-new'] + skillStats['write-update'] + skillStats['migrate'];
-  const skipped = skillStats['skip-diverged'] + skillStats['skip-unknown'];
-  const preserved = skillStats['skip-claimed'] + skillStats['skip-exists'];
+  const skillSummary = summarizeInstallStats(skillStats);
   const preservedBreakdown = [];
   if (skillStats['skip-claimed']) preservedBreakdown.push(`${skillStats['skip-claimed']} user-claimed`);
   if (skillStats['skip-exists']) preservedBreakdown.push(`${skillStats['skip-exists']} non-md kept`);
-  console.log(`  ✓ Skills: ${written} written (${skillStats['write-new']} new / ${skillStats['write-update']} updated / ${skillStats['migrate']} migrated), ${skipped} skipped${preserved ? `, ${preservedBreakdown.join(' / ')}` : ''}`);
+  console.log(`  ✓ Skills: ${skillSummary.written} written (${skillStats['write-new']} new / ${skillStats['write-update']} updated / ${skillStats['migrate']} migrated), ${skillSummary.skipped} skipped${skillSummary.preserved ? `, ${preservedBreakdown.join(' / ')}` : ''}`);
 
   // 4. Install agents via the same protocol (agent files are single .md each)
   if (resolvedProfile.agents.length > 0) {
     const destAgents = path.join(claudeDir, 'agents');
-    const agentStats = { 'write-new': 0, 'write-update': 0, 'migrate': 0, 'skip-diverged': 0, 'skip-unknown': 0, 'skip-claimed': 0, 'skip-exists': 0 };
+    const agentStats = makeInstallStats();
     for (const agentName of resolvedProfile.agents) {
       const srcAgent = path.join(AGENTS_DIR, `${agentName}.md`);
       if (!fs.existsSync(srcAgent)) continue;
       const destAgent = path.join(destAgents, `${agentName}.md`);
       installProtectedFile({ srcFile: srcAgent, destFile: destAgent, calsuiteDir, currentSha, stats: agentStats, divergences });
     }
-    const aWritten = agentStats['write-new'] + agentStats['write-update'] + agentStats['migrate'];
-    const aSkipped = agentStats['skip-diverged'] + agentStats['skip-unknown'];
-    console.log(`  ✓ Agents: ${aWritten} written, ${aSkipped} skipped${agentStats['skip-claimed'] ? `, ${agentStats['skip-claimed']} user-claimed` : ''}`);
+    const agentSummary = summarizeInstallStats(agentStats);
+    console.log(`  ✓ Agents: ${agentSummary.written} written, ${agentSummary.skipped} skipped${agentStats['skip-claimed'] ? `, ${agentStats['skip-claimed']} user-claimed` : ''}`);
   }
 
   // 5. Copy templates (never overwrite existing)
@@ -716,7 +740,7 @@ function installOnly(targetDir, onlySkills, onlyAgents, outerDivergences = null)
   // protocol so explicit --only installs never silently clobber local edits).
   if (onlySkills.length > 0) {
     const destSkills = path.join(claudeDir, 'skills');
-    const stats = { 'write-new': 0, 'write-update': 0, 'migrate': 0, 'skip-diverged': 0, 'skip-unknown': 0, 'skip-claimed': 0, 'skip-exists': 0 };
+    const stats = makeInstallStats();
     let count = 0;
     for (const skillName of onlySkills) {
       if (INTERNAL_SKILLS.has(skillName)) {
@@ -737,15 +761,14 @@ function installOnly(targetDir, onlySkills, onlyAgents, outerDivergences = null)
         missing.push(`skill:${skillName}`);
       }
     }
-    const written = stats['write-new'] + stats['write-update'] + stats['migrate'];
-    const skipped = stats['skip-diverged'] + stats['skip-unknown'];
-    console.log(`  → ${count} skill(s): ${written} files written, ${skipped} skipped, ${stats['skip-claimed'] + stats['skip-exists']} preserved`);
+    const summary = summarizeInstallStats(stats);
+    console.log(`  → ${count} skill(s): ${summary.written} files written, ${summary.skipped} skipped, ${summary.preserved} preserved`);
   }
 
   // Install specified agents through the same protocol.
   if (onlyAgents.length > 0) {
     const destAgents = path.join(claudeDir, 'agents');
-    const stats = { 'write-new': 0, 'write-update': 0, 'migrate': 0, 'skip-diverged': 0, 'skip-unknown': 0, 'skip-claimed': 0, 'skip-exists': 0 };
+    const stats = makeInstallStats();
     let count = 0;
     for (const agentName of onlyAgents) {
       const srcAgent = path.join(AGENTS_DIR, `${agentName}.md`);
@@ -759,9 +782,8 @@ function installOnly(targetDir, onlySkills, onlyAgents, outerDivergences = null)
         missing.push(`agent:${agentName}`);
       }
     }
-    const written = stats['write-new'] + stats['write-update'] + stats['migrate'];
-    const skipped = stats['skip-diverged'] + stats['skip-unknown'];
-    console.log(`  → ${count} agent(s): ${written} written, ${skipped} skipped`);
+    const summary = summarizeInstallStats(stats);
+    console.log(`  → ${count} agent(s): ${summary.written} written, ${summary.skipped} skipped`);
   }
 
   // Also install into workspaces if monorepo
@@ -835,7 +857,8 @@ function destToCalsuiteRel(destPath) {
   const afterClaude = destPath.slice(idx + marker.length);
   const first = afterClaude.split(path.sep)[0];
   if (first === 'skills' || first === 'agents') {
-    return afterClaude.replace(new RegExp('\\' + path.sep, 'g'), '/');
+    // Normalize to forward-slashes so the path matches calsuite's git-tracked layout on Windows too.
+    return afterClaude.split(path.sep).join('/');
   }
   return null;
 }
