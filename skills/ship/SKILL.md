@@ -249,6 +249,27 @@ git push -u origin $(git branch --show-current)
 
 ---
 
+## Step 7.5: Generate Development Flow diagram
+
+Before creating the PR, check if a flow trace file exists for this session and is non-empty. Use the `:-unknown` fallback so the path still resolves when `CLAUDE_SESSION_ID` is unset (matching the convention used by calsuite's other session-scoped trackers, e.g. `skill-usage-tracker.cjs`):
+
+```bash
+session_id="${CLAUDE_SESSION_ID:-unknown}"
+test -s ".claude/flow-trace-${session_id}.jsonl"
+```
+
+If the file exists and is non-empty, read and parse the JSONL entries and generate a Mermaid `flowchart TD` diagram following the same rules as the `/flow` skill:
+- Skill nodes: `S1(skill-name)`, Agent nodes: `A1{{agent-type: description}}`
+- Sequential entries get `-->` edges
+- Parallel detection: entries within 1s of each other from same predecessor = fan-out
+- Collapse N identical consecutive dispatches into one node with `xN` label
+
+This diagram will be inserted as a `## Development Flow` section in the PR body (see below).
+
+If the trace file is missing or empty, skip the `## Development Flow` section entirely — no error, no placeholder.
+
+---
+
 ## Step 8: Create PR
 
 Read the PR body template at `skills/ship/pr-template.md` and follow its structure exactly.
@@ -256,6 +277,7 @@ Read the PR body template at `skills/ship/pr-template.md` and follow its structu
 Populate each section:
 - **Summary** — bullet points from CHANGELOG entries (what shipped)
 - **How It Works** — Mermaid diagram for non-trivial PRs (skip for < 50 lines, config-only, docs-only)
+- **Development Flow** — Mermaid diagram from flow trace (insert after How It Works, before Important Files). Only include if trace data exists.
 - **Important Files** — table of key files with one-line descriptions
 - **Test Results** — table from Step 3
 - **Pre-Landing Review** — findings from Step 4.5, or "No issues found."
