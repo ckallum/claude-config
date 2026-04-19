@@ -351,20 +351,11 @@ function installForProfile(targetDir, resolvedProfile, label, opts = {}) {
   //    a one-off per-target install.
   console.log(`  ✓ Skills inherited from parent .claude/ (not copied per-target)`);
 
-  // 4. Copy agents (only those in resolved profile)
-  if (resolvedProfile.agents.length > 0) {
-    const destAgents = path.join(claudeDir, 'agents');
-    fs.mkdirSync(destAgents, { recursive: true });
-    let agentCount = 0;
-    for (const agentName of resolvedProfile.agents) {
-      const srcAgent = path.join(AGENTS_DIR, `${agentName}.md`);
-      if (fs.existsSync(srcAgent)) {
-        fs.copyFileSync(srcAgent, path.join(destAgents, `${agentName}.md`));
-        agentCount++;
-      }
-    }
-    console.log(`  ✓ Copied ${agentCount} agent(s) → ${destAgents}`);
-  }
+  // 4. Agents are inherited from ~/Projects/.claude/agents/ (symlinked by syncParentAssets).
+  //    Per-target copies are intentionally not written — same reasoning as skills above.
+  //    Profile filtering is not load-bearing: agents only activate when invoked, so extras
+  //    are invisible. Use `--only-agents <name>` for a one-off per-target install.
+  console.log(`  ✓ Agents inherited from parent .claude/ (not copied per-target)`);
 
   // 5. Copy templates (never overwrite existing)
   if (resolvedProfile.templates.includes('specs')) {
