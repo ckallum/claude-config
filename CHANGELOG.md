@@ -86,7 +86,7 @@ Expected first-sync output for a target with local edits:
 - `syncParentAssets()` and `PARENT_CLAUDE_DIR` — they created symlinks at `~/Projects/.claude/` under the assumption that Claude Code inherits skills from parent-directory `.claude/` dirs. Per the [official docs](https://code.claude.com/docs/en/skills), only enterprise/personal/project/plugin levels are discovered — parent-dir inheritance is not a supported feature.
 - `resolveHookPaths()` — pre-resolving `${CLAUDE_CONFIG_DIR}` into an absolute path inside `settings.json` was exactly the bug that broke collaborators' checkouts.
 - `symlinkDirSync` and `symlinkOrSkip` helpers — no longer referenced (scripts no longer symlinked into targets).
-- `--copy` flag kept parseable but documented as a deprecated no-op (its only effect was toggling script symlink-vs-copy, and scripts are no longer copied into targets at all).
+- `--copy` flag — removed entirely. Its only effect was toggling script symlink-vs-copy, and scripts are no longer copied into targets at all. Now errors with "Unknown flag" instead of silently no-opping.
 
 ## [2.5] — 2026-04-19
 

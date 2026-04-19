@@ -23,8 +23,6 @@
  *                                `_origin: <target-name>` in frontmatter, preserves
  *                                content. Subsequent syncs never touch it.
  *   --yes, -y                    Skip confirmation prompts for destructive operations.
- *   --copy                       (deprecated, no-op) formerly toggled script copy vs symlink;
- *                                hook scripts are now referenced directly from $CALSUITE_DIR
  */
 
 const fs = require('fs');
@@ -958,8 +956,6 @@ function parseArgv() {
       flags.installCcstatusline = true;
     } else if (args[i] === '--sync') {
       flags.sync = true;
-    } else if (args[i] === '--copy') {
-      flags.copy = true;
     } else if (args[i] === '--yes' || args[i] === '-y') {
       flags.yes = true;
     } else if (args[i] === '--force-adopt') {
@@ -1042,7 +1038,7 @@ function main() {
         console.log(`  ⚠ Skipping ${target.path} (not found)`);
         continue;
       }
-      installTarget(targetPath, profilesConfig, { copy: flags.copy, divergences });
+      installTarget(targetPath, profilesConfig, { divergences });
     }
 
     console.log('\nSync complete!\n');
@@ -1076,7 +1072,6 @@ function main() {
   const divergences = [];
 
   const { isMonorepo } = installTarget(targetDir, profilesConfig, {
-    copy: flags.copy,
     logProfiles: true,
     copyWorkspaceDocs: true,
     divergences,
