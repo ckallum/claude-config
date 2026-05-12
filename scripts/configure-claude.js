@@ -698,9 +698,11 @@ function installForProfile(targetDir, resolvedProfile, label, opts = {}) {
   const skillNoOp = skillSummary.noOp ? `, ${skillSummary.noOp} unchanged` : '';
   const skillExcluded = excludedSkills.length ? `, ${excludedSkills.length} excluded by target config` : '';
   console.log(`  ✓ Skills: ${skillSummary.written} written (${skillStats['write-new']} new / ${skillStats['write-update']} updated / ${skillStats['migrate']} migrated)${skillNoOp}, ${skillSummary.skipped} skipped${skillSummary.preserved ? `, ${preservedBreakdown.join(' / ')}` : ''}${skillExcluded}`);
-  if (missingExcludes.length > 0) {
-    console.log(`  ⚠ targets.json skills.exclude entries with no matching profile-derived skill: ${missingExcludes.join(', ')}`);
-  }
+  // The per-target drift warning for excludes that don't match any
+  // profile-derived skill is emitted once by installTarget() against the
+  // union of every profile in the target's scope (root + workspaces in
+  // monorepos). Emitting it here would fire spuriously for monorepo targets
+  // where an excluded skill appears in some profiles but not others.
 
   // 4. Install agents via the same protocol (agent files are single .md each)
   if (resolvedProfile.agents.length > 0) {
@@ -948,6 +950,17 @@ function installOnly(targetDir, onlySkills, onlyAgents, outerDivergences = null)
   return missing;
 }
 
+// Emit a single `skills.exclude` drift warning for a target, scoped against the
+// union of every profile resolved during its install. In monorepo targets this
+// means root + every workspace — a skill that only lives in some of them is a
+// valid exclude, not drift.
+function emitTargetExcludeDriftWarning(unionedResolvedSkills, targetSkillsConfig) {
+  const { missing } = applyTargetSkillsFilter([...unionedResolvedSkills], targetSkillsConfig);
+  if (missing.length > 0) {
+    console.log(`  ⚠ targets.json skills.exclude entries with no matching profile-derived skill: ${missing.join(', ')}`);
+  }
+}
+
 function installTarget(targetDir, profilesConfig, opts = {}) {
   const detectedProfiles = detectProfiles(targetDir);
   if (opts.logProfiles) {
@@ -955,10 +968,14 @@ function installTarget(targetDir, profilesConfig, opts = {}) {
   }
 
   const isMonorepo = detectedProfiles.includes('monorepo');
+  // Union of resolved skills across every profile in this target's scope.
+  // Drives the single per-target drift warning emitted at the end.
+  const unionedResolvedSkills = new Set();
 
   if (isMonorepo) {
     const rootProfileNames = detectedProfiles.filter(p => p !== 'monorepo').concat('monorepo-root');
     const rootResolved = resolveProfile(rootProfileNames, profilesConfig);
+    rootResolved.skills.forEach(s => unionedResolvedSkills.add(s));
     installForProfile(targetDir, rootResolved, `monorepo root [${rootProfileNames.join(', ')}]`, opts);
 
     // `workspaces: "skip"` in targets.json means this target treats only the
@@ -969,6 +986,7 @@ function installTarget(targetDir, profilesConfig, opts = {}) {
       if (opts.logProfiles) {
         console.log(`\n  Skipping workspace harness install (targets.json: workspaces = "skip")`);
       }
+      emitTargetExcludeDriftWarning(unionedResolvedSkills, opts.targetSkillsConfig);
       return { detectedProfiles, isMonorepo, rootProfileNames };
     }
 
@@ -979,6 +997,7 @@ function installTarget(targetDir, profilesConfig, opts = {}) {
         console.log(`\n  Workspace "${ws.name}" profiles: ${wsProfiles.join(', ')}`);
       }
       const wsResolved = resolveProfile(wsProfiles, profilesConfig);
+      wsResolved.skills.forEach(s => unionedResolvedSkills.add(s));
       // `opts.targetSkillsConfig` carries across to workspaces by design — the
       // targets.json entry describes the repo as a whole, so an `skills.exclude`
       // applies to root and every workspace mirror within it.
@@ -993,11 +1012,14 @@ function installTarget(targetDir, profilesConfig, opts = {}) {
       }
     }
 
+    emitTargetExcludeDriftWarning(unionedResolvedSkills, opts.targetSkillsConfig);
     return { detectedProfiles, isMonorepo, rootProfileNames };
   }
 
   const resolved = resolveProfile(detectedProfiles, profilesConfig);
+  resolved.skills.forEach(s => unionedResolvedSkills.add(s));
   installForProfile(targetDir, resolved, detectedProfiles.join(', '), opts);
+  emitTargetExcludeDriftWarning(unionedResolvedSkills, opts.targetSkillsConfig);
   return { detectedProfiles, isMonorepo };
 }
 
