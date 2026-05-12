@@ -2,7 +2,7 @@
 
 Personal Claude Code configuration repo (dotfiles-style). Hooks, commands, scripts, plugins, skills, and agents that bootstrap new projects.
 
-**Version: 2.28** — full history in [CHANGELOG.md](./CHANGELOG.md).
+**Version: 2.29** — full history in [CHANGELOG.md](./CHANGELOG.md).
 
 ## Routing
 
@@ -78,6 +78,8 @@ templates/   # spec / doc / changelog templates
 - `global-settings.json` stores empty placeholders for API keys; real keys go in `~/.mcp.json` only.
 - MCP tool names change across versions (e.g. Context7 `get-library-docs` → `query-docs`) — verify against the live server.
 - Hook entries in `hooks.json` MUST have `"_origin": "calsuite"` — the installer uses this to merge without overwriting project-specific hooks.
+- Calsuite is **not** listed in `config/targets.json` — it is the source, not a downstream, so `--sync` never touches it.
+- After structural changes to hooks, profiles, skills, or scripts, run `node scripts/configure-claude.js .` from the calsuite root to refresh `.claude/settings.local.json` here. The committed `.claude/settings.json` stays plugins + permissions only.
 - Claude Code MCP schema uses `"type": "http"` for remote servers, NOT `"type": "url"`.
 - Claude Code's skill hierarchy is enterprise > personal (`~/.claude/`) > project (CWD's `.claude/`) > plugin. Parent-directory `.claude/skills/` is **not** discovered automatically.
 - Review gate blocks commits without `@code-reviewer` approval — bypass with `[skip-review]`, `docs:`/`chore:`/`style:` prefix, or md-only changes.

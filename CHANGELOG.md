@@ -2,7 +2,18 @@
 
 All notable changes to this repository.
 
-Current version: **2.28**
+Current version: **2.29**
+
+## [2.29] — 2026-05-12
+
+### Fixed
+
+- **`.claude/settings.json`** — dropped the entire `hooks` block (previously held 19 `PreToolUse`/`PreCompact`/`SessionStart`/`PostToolUse`/`Stop`/`SessionEnd` entries with relative `.claude/scripts/hooks/...` paths). The block violated the documented rule "`<target>/.claude/settings.json` — team-shared (committed). Installer writes `enabledPlugins` and `permissions` here. Never hooks, never paths." On calsuite-self it caused duplicate hook firings — once via the legacy committed entries and once via the absolute-path entries the installer writes to `.claude/settings.local.json`. After this commit calsuite-self relies entirely on the installer-managed `settings.local.json`, matching every downstream target.
+- **`CLAUDE.md` Gotchas** — added two "calsuite is its own target" bullets: calsuite is not in `config/targets.json` (so `--sync` never touches it), and re-installing onto itself is a manual `node scripts/configure-claude.js .` after structural changes to hooks, profiles, skills, or scripts.
+
+### Why
+
+Issue [#83](https://github.com/ckallum/calsuite/issues/83) closes a partially-addressed cleanup started in [#81](https://github.com/ckallum/calsuite/pull/81) (which removed two stale `flow-trace` entries during the `/flow` relocation). Re-running the installer on calsuite-self then exposed a separate latent bug: 19 marker-less calsuite entries in the existing `settings.local.json` were preserved as "project-specific" by `mergeHooks()` while the installer wrote 21 fresh `_origin: calsuite` entries alongside, producing exact-duplicate hook wiring inside one file. The local copy was cleaned up here as a one-shot; the durable installer fix tracked under [#84](https://github.com/ckallum/calsuite/issues/84).
 
 ## [2.28] — 2026-05-08
 
