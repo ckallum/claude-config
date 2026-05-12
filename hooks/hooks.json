@@ -239,7 +239,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "rm -f \"${CLAUDE_PROJECT_DIR:-.}/.claude/flow-trace-${CLAUDE_SESSION_ID:-unknown}.jsonl\""
+            "command": "node \"${CALSUITE_DIR}/scripts/hooks/flow-trace-cleanup.cjs\""
           }
         ],
         "description": "Clean up flow trace files",
