@@ -2,7 +2,17 @@
 
 All notable changes to this repository.
 
-Current version: **2.30**
+Current version: **2.31**
+
+## [2.31] — 2026-05-13
+
+### Added
+
+- **`/improve-prompt` skill** — audit and rewrite a prompt against [Anthropic's prompt engineering best practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices). Mirrors `/humanize`'s shape (file path / `above` / inline / ask) but targets prompt content — system prompts for Claude API apps, agent definitions, skill bodies. Scoped deliberately to **content**, not API-side knobs: if the diagnosis is actually wrong effort level or missing adaptive thinking, the skill routes the user to `/claude-api` instead of papering over a config problem with prose. Ruleset condensed from the upstream doc covers the colleague test, positive-vs-negative instructions, few-shot examples with `<example>` tags, XML structuring, long-context layout (docs top / query bottom / grounding-in-quotes), match-prompt-style-to-output-style, imperative-vs-suggestive tool framing, dialing back `CRITICAL: MUST` over-emphasis on newer models, and structured `<thinking>` / `<answer>` reasoning. Single-page `references/checklist.md` for fast triage passes. Registered in `base.skills` and `monorepo-root.skills`.
+
+### Why
+
+Prompt engineering is the third "shape" the user hit — first `/humanize` for prose, then ambient writing rules in `CLAUDE.md`, now structured prompt audits. The upstream Anthropic doc is the right reference, but it's ~870 lines and mixes prompt-content guidance with model/API-config tuning (effort, adaptive thinking, prefill migration) that belongs to `/claude-api`. A skill collapses the relevant slice into an on-demand audit-and-rewrite pass and resolves the scope-vs-`/claude-api` question explicitly so the two skills don't fight. Mirroring `/humanize`'s ergonomics (`above` / `last` for the most recent assistant output, inline text, file path) means the muscle memory transfers.
 
 ## [2.30] — 2026-05-12
 
