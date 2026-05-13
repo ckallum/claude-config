@@ -500,6 +500,36 @@ function validateProfilesConfig(profilesConfig) {
   }
 }
 
+/**
+ * Apply a per-target `skills.exclude` filter to the profile-resolved skill
+ * list. The target's entry in `config/targets.json` may carry:
+ *   { "skills": { "exclude": ["skill-a", "skill-b"] } }
+ *
+ * Returns `{ filtered, excluded, missing }`:
+ *   - filtered: skill names that survive the filter (in original order)
+ *   - excluded: skill names that were both in `resolvedSkills` and in the
+ *     exclude list (i.e. genuinely removed)
+ *   - missing: skill names listed in exclude that did NOT appear in
+ *     `resolvedSkills` — typo or drift signal for the caller to surface
+ *
+ * Pure function: returns data, does not log. Callers decide how to render.
+ */
+function applyTargetSkillsFilter(resolvedSkills, targetSkillsConfig) {
+  const rawExclude = targetSkillsConfig?.exclude;
+  if (!Array.isArray(rawExclude) || rawExclude.length === 0) {
+    return { filtered: resolvedSkills, excluded: [], missing: [] };
+  }
+  // Drop non-string entries so a stray null/number in hand-edited targets.json
+  // doesn't silently land in `missing` as a phantom drift warning.
+  const exclude = rawExclude.filter(s => typeof s === 'string');
+  const excludeSet = new Set(exclude);
+  const resolvedSet = new Set(resolvedSkills);
+  const filtered = resolvedSkills.filter(s => !excludeSet.has(s));
+  const excluded = resolvedSkills.filter(s => excludeSet.has(s));
+  const missing = exclude.filter(s => !resolvedSet.has(s));
+  return { filtered, excluded, missing };
+}
+
 function findWorkspaces(targetDir) {
   const workspaces = [];
 
@@ -643,10 +673,15 @@ function installForProfile(targetDir, resolvedProfile, label, opts = {}) {
   //    Every markdown file under each profile-listed skill dir is copied
   //    with `_origin: calsuite@<sha>` stamped into its frontmatter.
   //    Existing files with local edits are detected and preserved.
+  //    Per-target `skills.exclude` from targets.json is applied here —
+  //    excluded names are dropped from the iteration, and entries that
+  //    don't match any profile-derived skill surface as a drift warning.
   const destSkills = path.join(claudeDir, 'skills');
   const skillStats = makeInstallStats();
   const divergences = opts.divergences || [];
-  for (const skillName of resolvedProfile.skills) {
+  const { filtered: filteredSkills, excluded: excludedSkills, missing: missingExcludes } =
+    applyTargetSkillsFilter(resolvedProfile.skills, opts.targetSkillsConfig);
+  for (const skillName of filteredSkills) {
     if (INTERNAL_SKILLS.has(skillName)) continue;
     const srcSkill = path.join(SKILLS_DIR, skillName);
     if (!fs.existsSync(srcSkill) || !fs.statSync(srcSkill).isDirectory()) continue;
@@ -661,7 +696,13 @@ function installForProfile(targetDir, resolvedProfile, label, opts = {}) {
   if (skillStats['skip-claimed']) preservedBreakdown.push(`${skillStats['skip-claimed']} user-claimed`);
   if (skillStats['skip-exists']) preservedBreakdown.push(`${skillStats['skip-exists']} non-md kept`);
   const skillNoOp = skillSummary.noOp ? `, ${skillSummary.noOp} unchanged` : '';
-  console.log(`  ✓ Skills: ${skillSummary.written} written (${skillStats['write-new']} new / ${skillStats['write-update']} updated / ${skillStats['migrate']} migrated)${skillNoOp}, ${skillSummary.skipped} skipped${skillSummary.preserved ? `, ${preservedBreakdown.join(' / ')}` : ''}`);
+  const skillExcluded = excludedSkills.length ? `, ${excludedSkills.length} excluded by target config` : '';
+  console.log(`  ✓ Skills: ${skillSummary.written} written (${skillStats['write-new']} new / ${skillStats['write-update']} updated / ${skillStats['migrate']} migrated)${skillNoOp}, ${skillSummary.skipped} skipped${skillSummary.preserved ? `, ${preservedBreakdown.join(' / ')}` : ''}${skillExcluded}`);
+  // The per-target drift warning for excludes that don't match any
+  // profile-derived skill is emitted once by installTarget() against the
+  // union of every profile in the target's scope (root + workspaces in
+  // monorepos). Emitting it here would fire spuriously for monorepo targets
+  // where an excluded skill appears in some profiles but not others.
 
   // 4. Install agents via the same protocol (agent files are single .md each)
   if (resolvedProfile.agents.length > 0) {
@@ -909,6 +950,17 @@ function installOnly(targetDir, onlySkills, onlyAgents, outerDivergences = null)
   return missing;
 }
 
+// Emit a single `skills.exclude` drift warning for a target, scoped against the
+// union of every profile resolved during its install. In monorepo targets this
+// means root + every workspace — a skill that only lives in some of them is a
+// valid exclude, not drift.
+function emitTargetExcludeDriftWarning(unionedResolvedSkills, targetSkillsConfig) {
+  const { missing } = applyTargetSkillsFilter([...unionedResolvedSkills], targetSkillsConfig);
+  if (missing.length > 0) {
+    console.log(`  ⚠ targets.json skills.exclude entries with no matching profile-derived skill: ${missing.join(', ')}`);
+  }
+}
+
 function installTarget(targetDir, profilesConfig, opts = {}) {
   const detectedProfiles = detectProfiles(targetDir);
   if (opts.logProfiles) {
@@ -916,10 +968,14 @@ function installTarget(targetDir, profilesConfig, opts = {}) {
   }
 
   const isMonorepo = detectedProfiles.includes('monorepo');
+  // Union of resolved skills across every profile in this target's scope.
+  // Drives the single per-target drift warning emitted at the end.
+  const unionedResolvedSkills = new Set();
 
   if (isMonorepo) {
     const rootProfileNames = detectedProfiles.filter(p => p !== 'monorepo').concat('monorepo-root');
     const rootResolved = resolveProfile(rootProfileNames, profilesConfig);
+    rootResolved.skills.forEach(s => unionedResolvedSkills.add(s));
     installForProfile(targetDir, rootResolved, `monorepo root [${rootProfileNames.join(', ')}]`, opts);
 
     // `workspaces: "skip"` in targets.json means this target treats only the
@@ -930,6 +986,7 @@ function installTarget(targetDir, profilesConfig, opts = {}) {
       if (opts.logProfiles) {
         console.log(`\n  Skipping workspace harness install (targets.json: workspaces = "skip")`);
       }
+      emitTargetExcludeDriftWarning(unionedResolvedSkills, opts.targetSkillsConfig);
       return { detectedProfiles, isMonorepo, rootProfileNames };
     }
 
@@ -940,6 +997,10 @@ function installTarget(targetDir, profilesConfig, opts = {}) {
         console.log(`\n  Workspace "${ws.name}" profiles: ${wsProfiles.join(', ')}`);
       }
       const wsResolved = resolveProfile(wsProfiles, profilesConfig);
+      wsResolved.skills.forEach(s => unionedResolvedSkills.add(s));
+      // `opts.targetSkillsConfig` carries across to workspaces by design — the
+      // targets.json entry describes the repo as a whole, so an `skills.exclude`
+      // applies to root and every workspace mirror within it.
       installForProfile(ws.path, wsResolved, `workspace: ${ws.name} [${wsProfiles.join(', ')}]`, opts);
 
       if (opts.copyWorkspaceDocs && rootResolved.templates.includes('specs')) {
@@ -951,11 +1012,14 @@ function installTarget(targetDir, profilesConfig, opts = {}) {
       }
     }
 
+    emitTargetExcludeDriftWarning(unionedResolvedSkills, opts.targetSkillsConfig);
     return { detectedProfiles, isMonorepo, rootProfileNames };
   }
 
   const resolved = resolveProfile(detectedProfiles, profilesConfig);
+  resolved.skills.forEach(s => unionedResolvedSkills.add(s));
   installForProfile(targetDir, resolved, detectedProfiles.join(', '), opts);
+  emitTargetExcludeDriftWarning(unionedResolvedSkills, opts.targetSkillsConfig);
   return { detectedProfiles, isMonorepo };
 }
 
@@ -1771,7 +1835,11 @@ function main() {
         continue;
       }
       const skipWorkspaces = target.workspaces === 'skip';
-      installTarget(targetPath, profilesConfig, { divergences, skipWorkspaces });
+      installTarget(targetPath, profilesConfig, {
+        divergences,
+        skipWorkspaces,
+        targetSkillsConfig: target.skills,
+      });
     }
 
     console.log('\nSync complete!\n');
@@ -1820,6 +1888,7 @@ function main() {
     copyWorkspaceDocs: true,
     divergences,
     skipWorkspaces,
+    targetSkillsConfig: matchingTarget?.skills,
   });
 
   // Global settings check
